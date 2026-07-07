@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DOGE Monitor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #0f0f23;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  .header {
+    text-align: center;
+    padding: 24px 16px 8px;
+  }
+  .header .emoji { font-size: 48px; }
+  .header h1 { color: #f5a623; font-size: 22px; margin: 8px 0; }
+  .header .time { color: #888; font-size: 13px; }
+
+  .card {
+    background: #1a1a2e;
+    border-radius: 16px;
+    padding: 16px;
+    margin: 12px 16px;
+    border: 1px solid #2a2a4a;
+  }
+  .card-title { color: #f5a623; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+
+  .price-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .price-value { color: #fff; font-size: 36px; font-weight: 800; flex: 1; }
+  .change-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .change-up { background: #1b5e20; }
+  .change-down { background: #b71c1c; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .metric {
+    text-align: center;
+    padding: 8px 4px;
+  }
+  .metric .label { color: #888; font-size: 10px; margin-bottom: 4px; }
+  .metric .value { color: #e0e0e0; font-size: 13px; font-weight: 600; }
+
+  .phase-box {
+    background: rgba(245,166,35,0.12);
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .phase-text { color: #f5a623; font-size: 15px; font-weight: 700; }
+  .summary-text { color: #bbb; font-size: 14px; line-height: 1.7; margin-bottom: 12px; }
+
+  .levels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .level {
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+  .level.support { background: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.2); }
+  .level.resist { background: rgba(244,67,54,0.1); border: 1px solid rgba(244,67,54,0.2); }
+  .level .lbl { font-size: 13px; color: #ccc; margin-bottom: 4px; }
+  .level .val { font-size: 18px; font-weight: 800; color: #fff; }
+
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pill {
+    background: rgba(255,255,255,0.05);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #ccc;
+  }
+  .pill b { color: #e0e0e0; }
+
+  .footer {
+    text-align: center;
+    padding: 20px 16px;
+    color: #555;
+    font-size: 11px;
+    line-height: 1.6;
+  }
+
+  .refresh-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    color: #888;
+    font-size: 13px;
+  }
+  .refresh-btn {
+    background: #f5a623;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .refresh-btn:active { opacity: 0.8; }
+
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: #888;
+  }
+  .loading .spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid #2a2a4a;
+    border-top-color: #f5a623;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .error { text-align: center; padding: 60px 20px; color: #f44336; }
+  .error .big { font-size: 48px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div>加载中...</div>
+  </div>
+</div>
+
+<script>
+const REPORT_URL = 'https://raw.githubusercontent.com/2kv9n8vc6y-png/doge-monitor/master/public/latest.json';
+
+function formatNum(n) {
+  if (n == null) return '-';
+  if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (n >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  if (n >= 1e3) return '$' + (n/1e3).toFixed(2) + 'K';
+  return '$' + n.toFixed(2);
+}
+
+async function fetchReport() {
+  const resp = await fetch(REPORT_URL, { cache: 'no-cache' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return resp.json();
+}
+
+function render(report) {
+  const p = report.price;
+  const c = report.chain;
+  const a = report.analysis;
+  const change = p.change_24h_pct || 0;
+  const isUp = change >= 0;
+  const emoji = report.type === 'morning' ? '☀️' : '🌙';
+  const label = report.type === 'morning' ? 'DOGE 早报' : 'DOGE 晚报';
+  const ts = new Date(report.timestamp).toLocaleString('zh-CN');
+
+  document.getElementById('app').innerHTML = `
+    <div class="header">
+      <div class="emoji">🐕</div>
+      <h1>${emoji} ${label}</h1>
+      <div class="time">${ts}</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">💰 价格</div>
+      <div class="price-row">
+        <div class="price-value">$${p.price_usd?.toFixed(5) || 'N/A'}</div>
+        <div class="change-badge ${isUp ? 'change-up' : 'change-down'}">
+          ${isUp ? '+' : ''}${change.toFixed(2)}%
+        </div>
+      </div>
+      <div class="grid">
+        <div class="metric"><div class="label">24h高</div><div class="value">$${p.high_24h_usd?.toFixed(5) || '-'}</div></div>
+        <div class="metric"><div class="label">24h低</div><div class="value">$${p.low_24h_usd?.toFixed(5) || '-'}</div></div>
+        <div class="metric"><div class="label">7日</div><div class="value" style="color:${(p.change_7d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_7d_pct?.toFixed(1) || '-'}%</div></div>
+        <div class="metric"><div class="label">30日</div><div class="value" style="color:${(p.change_30d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_30d_pct?.toFixed(1) || '-'}%</div></div>
+      </div>
+      <div class="grid">
+        <div class="metric"><div class="label">市值</div><div class="value">${formatNum(p.market_cap_usd)}</div></div>
+        <div class="metric"><div class="label">排名</div><div class="value">#${p.market_cap_rank || '-'}</div></div>
+        <div class="metric"><div class="label">24h量</div><div class="value">${formatNum(p.volume_24h_usd)}</div></div>
+        <div class="metric"><div class="label">流通量</div><div class="value">${(p.circulating_supply/1e9)?.toFixed(1) || '-'}B</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">⛓️ 链上数据</div>
+      <div class="grid">
+        <div class="metric"><div class="label">24h交易</div><div class="value">${c.transactions_24h?.toLocaleString() || '-'}</div></div>
+        <div class="metric"><div class="label">手续费</div><div class="value">$${c.fee_24h_usd?.toFixed(0) || '-'}</div></div>
+        <div class="metric"><div class="label">Mempool</div><div class="value">${c.mempool_transactions?.toLocaleString() || '-'}</div></div>
+        <div class="metric"><div class="label">节点</div><div class="value">${c.nodes?.toLocaleString() || '-'}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🧠 分析</div>
+      <div class="phase-box">
+        <div class="phase-text">${a.phase}</div>
+      </div>
+      <div class="summary-text">${a.summary}</div>
+      <div class="levels">
+        <div class="level support">
+          <div class="lbl">🟢 支撑位</div>
+          <div class="val">$${a.support?.toFixed(5)}</div>
+        </div>
+        <div class="level resist">
+          <div class="lbl">🔴 阻力位</div>
+          <div class="val">$${a.resistance?.toFixed(5)}</div>
+        </div>
+      </div>
+      <div class="levels">
+        <div class="level support">
+          <div class="lbl">🟢 强支撑</div>
+          <div class="val">$${a.major_support?.toFixed(5)}</div>
+        </div>
+        <div class="level resist">
+          <div class="lbl">🔴 强阻力</div>
+          <div class="val">$${a.major_resistance?.toFixed(5)}</div>
+        </div>
+      </div>
+      <div class="pills">
+        <div class="pill">换手率 <b>${a.key_indicators?.vol_mcap_ratio}%</b></div>
+        <div class="pill">链上TX <b>${a.key_indicators?.transactions_24h?.toLocaleString() || '-'}</b></div>
+        <div class="pill">Mempool <b>${a.key_indicators?.mempool_txs?.toLocaleString() || '-'}</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📜 历史对比</div>
+      <div class="grid">
+        <div class="metric"><div class="label">ATH</div><div class="value">$${p.ath_usd?.toFixed(4) || '-'}</div></div>
+        <div class="metric"><div class="label">距ATH</div><div class="value" style="color:#f44336">${p.ath_usd ? ((p.price_usd/p.ath_usd - 1)*100).toFixed(0) : '-'}%</div></div>
+        <div class="metric"><div class="label">ATL</div><div class="value">$${p.atl_usd?.toFixed(6) || '-'}</div></div>
+        <div class="metric"><div class="label">距ATL</div><div class="value" style="color:#4caf50">${p.atl_usd ? ((p.price_usd/p.atl_usd - 1)*100).toFixed(0) : '-'}%</div></div>
+      </div>
+    </div>
+
+    <div class="refresh-bar">
+      <span id="updateTime">更新于 ${ts}</span>
+      <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
+    </div>
+
+    <div class="footer">
+      数据来源: CoinGecko + Blockchair<br>
+      自动更新 · 仅供参考 · 不构成投资建议<br>
+      <span style="font-size:10px">github.com/2kv9n8vc6y-png/doge-monitor</span>
+    </div>
+  `;
+}
+
+async function main() {
+  try {
+    const report = await fetchReport();
+    render(report);
+  } catch (e) {
+    document.getElementById('app').innerHTML = `
+      <div class="error">
+        <div class="big">🐕‍🦺</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">加载失败</div>
+        <div style="font-size:14px;color:#888;margin-bottom:16px;">${e.message}</div>
+        <button class="refresh-btn" onclick="location.reload()">重试</button>
+      </div>
+    `;
+  }
+}
+
+main();
+</script>
+</body>
+</html>
