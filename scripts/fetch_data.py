@@ -99,94 +99,81 @@ def fetch_blockchair():
 
 def fetch_whale_transactions(price_usd):
     """
-    Fetch recent large DOGE transactions from BlockCypher API (free tier, no key needed).
-    Samples multiple pages to build a whale activity profile.
-    Returns whale activity summary.
+    Fetch large DOGE transactions from 3xpl.com (Blockchair v3, free tier).
+    Falls back to BlockCypher if 3xpl is unavailable.
+    Combines mempool large tx + on-chain stats to estimate whale activity.
     """
-    BLOCKCYPHER_BASE = "https://api.blockcypher.com/v1/doge/main/txs"
     whale_txs = []
     seen_hashes = set()
 
-    # Fetch multiple pages to get a good sample of large transactions
-    for page in range(3):
-        try:
-            params = {"limit": 50}
-            resp = requests.get(BLOCKCYPHER_BASE, params=params, timeout=30)
-            resp.raise_for_status()
-            txs = resp.json()
-        except Exception as e:
-            print(f"  Warning: BlockCypher fetch failed (page {page}): {e}")
-            break
+    # ── Source 1: 3xpl.com (Blockchair v3) ─────────────────
+    try:
+        url = "https://api.3xpl.com/dogecoin/transaction"
+        params = {
+            "sort": "value",
+            "order": "desc",
+            "limit": 25,
+            "from": "last_day",
+        }
+        resp = requests.get(url, params=params, timeout=20)
+        if resp.status_code == 200:
+            data = resp.json().get("data", [])
+            for tx in data:
+                try:
+                    value_doge = float(tx.get("value", 0))
+                    value_usd = value_doge * price_usd
+                    if value_usd < 10000:
+                        continue
+                    whale_txs.append({
+                        "value_usd": round(value_usd, 2),
+                        "value_doge": round(value_doge, 0),
+                        "time": tx.get("time", ""),
+                        "source": "3xpl",
+                    })
+                except Exception:
+                    continue
+    except Exception as e:
+        print(f"  Warning: 3xpl fetch failed: {e}")
 
-        if not txs:
-            break
-
+    # ── Source 2: BlockCypher (mempool) ────────────────────
+    try:
+        url = "https://api.blockcypher.com/v1/doge/main/txs"
+        resp = requests.get(url, params={"limit": 50}, timeout=20)
+        resp.raise_for_status()
+        txs = resp.json()
         for tx in txs:
             try:
+                value_doge = float(tx.get("total", 0)) / 1e8
+                value_usd = value_doge * price_usd
+                if value_usd < 50000:
+                    continue
                 tx_hash = tx.get("hash", "")
                 if tx_hash in seen_hashes:
                     continue
                 seen_hashes.add(tx_hash)
-
-                # total is in satoshis; 1 DOGE = 100,000,000 satoshi
-                value_doge = float(tx.get("total", 0)) / 1e8
-                value_usd = value_doge * price_usd
-
-                # Skip dust (under $10K USD)
-                if value_usd < 10000:
-                    continue
-
-                confirmations = tx.get("confirmations", 0)
-                addresses = tx.get("addresses", [])
-                inputs = tx.get("inputs", [])
-                outputs = tx.get("outputs", [])
-                vin_sz = tx.get("vin_sz", 0)
-                vout_sz = tx.get("vout_sz", 0)
-
-                # Detect exchange addresses
-                is_exchange = False
-                matched_exchange = None
-                for addr in addresses:
-                    addr_lower = addr.lower()
-                    for ex_name, keywords in EXCHANGE_TAGS.items():
-                        for kw in keywords:
-                            if kw in addr_lower:
-                                is_exchange = True
-                                matched_exchange = ex_name
-                                break
-                        if is_exchange:
-                            break
-                    if is_exchange:
-                        break
-
                 whale_txs.append({
                     "value_usd": round(value_usd, 2),
                     "value_doge": round(value_doge, 0),
-                    "confirmations": confirmations,
-                    "is_exchange": is_exchange,
-                    "exchange": matched_exchange,
-                    "address_count": len(addresses),
                     "time": tx.get("received", ""),
+                    "source": "mempool",
                 })
             except Exception:
                 continue
-
-        # Only fetch next page if we got a full page (50 txs)
-        if len(txs) < 50:
-            break
+    except Exception as e:
+        print(f"  Warning: BlockCypher fetch failed: {e}")
 
     if not whale_txs:
         return None
 
-    # Calculate metrics
+    # Sort by value
+    whale_txs.sort(key=lambda t: t["value_usd"], reverse=True)
+
     total_whale_volume = sum(t["value_usd"] for t in whale_txs)
     whale_count_100k = sum(1 for t in whale_txs if t["value_usd"] >= 100000)
     whale_count_1m = sum(1 for t in whale_txs if t["value_usd"] >= 1000000)
     whale_count_10m = sum(1 for t in whale_txs if t["value_usd"] >= 10000000)
-    exchange_txs = [t for t in whale_txs if t["is_exchange"]]
-
-    # Sort by value descending
-    whale_txs.sort(key=lambda t: t["value_usd"], reverse=True)
+    mempool_count = sum(1 for t in whale_txs if t.get("source") == "mempool")
+    confirmed_count = sum(1 for t in whale_txs if t.get("source") == "3xpl")
 
     return {
         "whale_tx_count_100k": whale_count_100k,
@@ -194,61 +181,81 @@ def fetch_whale_transactions(price_usd):
         "whale_tx_count_10m": whale_count_10m,
         "total_whale_volume_usd": round(total_whale_volume, 2),
         "avg_whale_tx_value_usd": round(total_whale_volume / len(whale_txs), 2),
+        "largest_tx_usd": round(whale_txs[0]["value_usd"], 2) if whale_txs else None,
         "top_transactions": whale_txs[:10],
-        "exchange_related_count": len(exchange_txs),
-        "exchange_names": list(set(t["exchange"] for t in exchange_txs if t["exchange"])),
         "sample_size": len(whale_txs),
-        "confirmed_tx_count": sum(1 for t in whale_txs if t["confirmations"] > 0),
+        "mempool_whale_count": mempool_count,
+        "confirmed_whale_count": confirmed_count,
     }
 
 
-def analyze_whales(whale_data, price_data):
-    """Generate whale-specific analysis."""
+def analyze_whales(whale_data, price_data, chain_data):
+    """Generate whale-specific analysis combining on-chain stats + big tx data."""
     if not whale_data:
+        # Fallback: infer whale activity from available chain data
+        largest_tx = chain_data.get("largest_transaction_24h_usd", 0)
+        tx_count = chain_data.get("transactions_24h", 0)
+        fee_total = chain_data.get("fee_24h_usd", 0)
+
+        summaries = []
+        if largest_tx and largest_tx > 1000000:
+            summaries.append(f"24h最大转账${largest_tx:,.0f}")
+            activity = "链上有大额转账记录"
+        elif largest_tx and largest_tx > 100000:
+            summaries.append(f"24h最大转账${largest_tx:,.0f}")
+            activity = "中等活跃"
+        else:
+            activity = "暂无大额数据"
+
+        if tx_count > 40000:
+            summaries.append(f"日交易{tx_count}笔，链上活跃")
+        if fee_total and fee_total > 10000:
+            summaries.append(f"手续费${fee_total:,.0f}，网络需求偏高")
+
         return {
-            "status": "no_data",
-            "summary": "巨鲸数据暂不可用",
-            "activity_level": "unknown",
+            "status": "partial",
+            "activity_level": activity if summaries else "数据不足",
+            "summary": "；".join(summaries) if summaries else "巨鲸数据暂不可用，请参考链上数据",
+            "whale_tx_count_100k": 0,
+            "whale_tx_count_1m": 0,
+            "whale_tx_count_10m": 0,
+            "total_whale_volume_usd": 0,
+            "avg_whale_tx_value_usd": 0,
+            "largest_tx_usd": largest_tx,
         }
 
     count_1m = whale_data["whale_tx_count_1m"]
     count_100k = whale_data["whale_tx_count_100k"]
+    count_10m = whale_data["whale_tx_count_10m"]
     total_vol = whale_data["total_whale_volume_usd"]
     avg_val = whale_data["avg_whale_tx_value_usd"]
-    exchange_count = whale_data["exchange_related_count"]
-    top_txs = whale_data["top_transactions"]
+    mempool_whales = whale_data.get("mempool_whale_count", 0)
 
-    # Determine activity level
+    # Activity level
     if count_1m >= 5:
-        activity = "high"
         activity_cn = "高度活跃 🔥"
     elif count_1m >= 2:
-        activity = "medium"
         activity_cn = "温和活跃"
+    elif count_100k >= 5:
+        activity_cn = "有动作"
     else:
-        activity = "low"
         activity_cn = "低迷"
 
-    # Analyze direction
     summaries = []
-    if count_100k >= 10:
-        summaries.append(f"24h内≥10万$大额转账{count_100k}笔")
+    if whale_data.get("largest_tx_usd"):
+        summaries.append(f"最大单笔${whale_data['largest_tx_usd']:,.0f}")
+    if count_10m >= 1:
+        summaries.append(f"千万级巨鲸转账{count_10m}笔 💣")
     if count_1m >= 3:
-        summaries.append(f"百万级巨鲸交易{count_1m}笔")
-    if count_1m == 0:
-        summaries.append("无百万级以上转账，巨鲸按兵不动")
-    if exchange_count >= 3:
-        summaries.append(f"其中{exchange_count}笔与交易所相关")
-
-    if avg_val > 5000000:
-        summaries.append("平均单笔金额超$500万，大资金在动")
-    elif avg_val > 1000000:
-        summaries.append("平均单笔$100万+，中等体量资金活跃")
-
-    # Top tx info
-    if top_txs:
-        largest = top_txs[0]
-        summaries.insert(0, f"最大单笔：${largest['value_usd']:,.0f}")
+        summaries.append(f"百万级以上{count_1m}笔，大资金活跃")
+    elif count_1m >= 1:
+        summaries.append(f"百万级{count_1m}笔")
+    if count_100k >= 10:
+        summaries.append(f"≥$10万转账{count_100k}笔")
+    if mempool_whales >= 3:
+        summaries.append(f"mempool中{mempool_whales}笔大单待确认")
+    if avg_val > 1000000:
+        summaries.append(f"平均单笔${avg_val:,.0f}")
 
     return {
         "status": "ok",
@@ -256,11 +263,11 @@ def analyze_whales(whale_data, price_data):
         "summary": "；".join(summaries),
         "whale_tx_count_100k": count_100k,
         "whale_tx_count_1m": count_1m,
-        "whale_tx_count_10m": whale_data["whale_tx_count_10m"],
+        "whale_tx_count_10m": count_10m,
         "total_whale_volume_usd": total_vol,
         "avg_whale_tx_value_usd": avg_val,
-        "exchange_related_count": exchange_count,
-        "largest_tx_usd": round(top_txs[0]["value_usd"], 2) if top_txs else None,
+        "largest_tx_usd": whale_data.get("largest_tx_usd"),
+        "mempool_whale_count": mempool_whales,
     }
 
 
@@ -375,7 +382,7 @@ def main():
         print("  Whale: data unavailable")
 
     # Analyze
-    whale_analysis = analyze_whales(whale_data, price_data)
+    whale_analysis = analyze_whales(whale_data, price_data, chain_data)
     analysis = analyze_data(price_data, chain_data, whale_analysis)
 
     # Build report
