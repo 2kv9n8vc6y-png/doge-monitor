@@ -181,6 +181,7 @@ function render(report) {
   const p = report.price;
   const c = report.chain;
   const a = report.analysis;
+  const w = report.whale || {};
   const change = p.change_24h_pct || 0;
   const isUp = change >= 0;
   const emoji = report.type === 'morning' ? '☀️' : '🌙';
@@ -225,6 +226,31 @@ function render(report) {
         <div class="metric"><div class="label">节点</div><div class="value">${c.nodes?.toLocaleString() || '-'}</div></div>
       </div>
     </div>
+
+    ${w.status === 'ok' ? `
+    <div class="card">
+      <div class="card-title">🐋 巨鲸动向</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="font-size:24px;font-weight:800;color:#fff;">${w.activity_level}</div>
+        <div style="font-size:12px;color:#888;">${w.status === 'ok' ? '近24h大额转账' : ''}</div>
+      </div>
+      <div class="grid">
+        <div class="metric"><div class="label">>$10万笔数</div><div class="value" style="color:#f5a623;font-size:18px;">${w.whale_tx_count_100k || 0}</div></div>
+        <div class="metric"><div class="label">>$100万笔数</div><div class="value" style="color:#ff6b6b;font-size:18px;">${w.whale_tx_count_1m || 0}</div></div>
+        <div class="metric"><div class="label">>$1000万笔数</div><div class="value" style="color:#ff4444;font-size:18px;">${w.whale_tx_count_10m || 0}</div></div>
+        <div class="metric"><div class="label">交易所相关</div><div class="value">${w.exchange_related_count || 0}笔</div></div>
+      </div>
+      <div class="grid" style="margin-top:4px;">
+        <div class="metric"><div class="label">巨鲸总流量</div><div class="value">${formatNum(w.total_whale_volume_usd)}</div></div>
+        <div class="metric"><div class="label">平均单笔</div><div class="value">${formatNum(w.avg_whale_tx_value_usd)}</div></div>
+        <div class="metric"><div class="label">最大单笔</div><div class="value">${formatNum(w.largest_tx_usd)}</div></div>
+        <div class="metric"><div class="label">数据样本</div><div class="value">Top 25</div></div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:rgba(245,166,35,0.06);border-radius:10px;font-size:13px;color:#ccc;line-height:1.6;">
+        ${w.summary}
+      </div>
+    </div>
+    ` : ''}
 
     <div class="card">
       <div class="card-title">🧠 分析</div>
