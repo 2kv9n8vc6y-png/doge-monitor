@@ -97,102 +97,108 @@ def fetch_blockchair():
     }
 
 
-def fetch_whale_transactions():
+def fetch_whale_transactions(price_usd):
     """
-    Fetch the largest recent DOGE transactions from Blockchair.
+    Fetch recent large DOGE transactions from BlockCypher API (free tier, no key needed).
+    Samples multiple pages to build a whale activity profile.
     Returns whale activity summary.
     """
-    url = f"{BLOCKCHAIR_BASE}/dogecoin/transactions"
-    params = {
-        "s": "value_usd(desc)",
-        "limit": 25,
-    }
-    try:
-        resp = requests.get(url, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json().get("data", [])
-    except Exception as e:
-        print(f"  Warning: whale tx fetch failed: {e}")
-        return None
-
-    if not data:
-        return None
-
+    BLOCKCYPHER_BASE = "https://api.blockcypher.com/v1/doge/main/txs"
     whale_txs = []
-    total_whale_volume = 0
-    whale_count_100k = 0
-    whale_count_1m = 0
-    whale_count_10m = 0
-    exchange_in = 0
-    exchange_out = 0
-    exchange_in_count = 0
-    exchange_out_count = 0
+    seen_hashes = set()
 
-    for tx in data:
+    # Fetch multiple pages to get a good sample of large transactions
+    for page in range(3):
         try:
-            value_usd = float(tx.get("value_usd", 0) or 0)
-            inputs = tx.get("inputs", [])
-            outputs = tx.get("outputs", [])
+            params = {"limit": 50}
+            resp = requests.get(BLOCKCYPHER_BASE, params=params, timeout=30)
+            resp.raise_for_status()
+            txs = resp.json()
+        except Exception as e:
+            print(f"  Warning: BlockCypher fetch failed (page {page}): {e}")
+            break
 
-            # Whale tiers
-            if value_usd >= 100000:
-                whale_count_100k += 1
-            if value_usd >= 1000000:
-                whale_count_1m += 1
-            if value_usd >= 10000000:
-                whale_count_10m += 1
+        if not txs:
+            break
 
-            total_whale_volume += value_usd
+        for tx in txs:
+            try:
+                tx_hash = tx.get("hash", "")
+                if tx_hash in seen_hashes:
+                    continue
+                seen_hashes.add(tx_hash)
 
-            # Detect exchange-related transactions
-            all_addrs = []
-            for inp in inputs:
-                all_addrs.append(inp.get("recipient", "").lower())
-            for out in outputs:
-                all_addrs.append(out.get("recipient", "").lower())
+                # total is in satoshis; 1 DOGE = 100,000,000 satoshi
+                value_doge = float(tx.get("total", 0)) / 1e8
+                value_usd = value_doge * price_usd
 
-            is_exchange = False
-            matched_exchange = None
-            for addr in all_addrs:
-                for ex_name, keywords in EXCHANGE_TAGS.items():
-                    for kw in keywords:
-                        if kw in addr:
-                            is_exchange = True
-                            matched_exchange = ex_name
+                # Skip dust (under $10K USD)
+                if value_usd < 10000:
+                    continue
+
+                confirmations = tx.get("confirmations", 0)
+                addresses = tx.get("addresses", [])
+                inputs = tx.get("inputs", [])
+                outputs = tx.get("outputs", [])
+                vin_sz = tx.get("vin_sz", 0)
+                vout_sz = tx.get("vout_sz", 0)
+
+                # Detect exchange addresses
+                is_exchange = False
+                matched_exchange = None
+                for addr in addresses:
+                    addr_lower = addr.lower()
+                    for ex_name, keywords in EXCHANGE_TAGS.items():
+                        for kw in keywords:
+                            if kw in addr_lower:
+                                is_exchange = True
+                                matched_exchange = ex_name
+                                break
+                        if is_exchange:
                             break
                     if is_exchange:
                         break
-                if is_exchange:
-                    break
 
-            # Heuristic: if value > $100K, likely whale
-            direction = "unknown"
-            if is_exchange:
-                # Check if first input looks like it's FROM exchange (withdrawal)
-                # Simple heuristic: large tx with exchange tag = exchange-related
-                direction = "exchange_related"
+                whale_txs.append({
+                    "value_usd": round(value_usd, 2),
+                    "value_doge": round(value_doge, 0),
+                    "confirmations": confirmations,
+                    "is_exchange": is_exchange,
+                    "exchange": matched_exchange,
+                    "address_count": len(addresses),
+                    "time": tx.get("received", ""),
+                })
+            except Exception:
+                continue
 
-            whale_txs.append({
-                "value_usd": round(value_usd, 2),
-                "value_doge": round(float(tx.get("value", 0) or 0), 0),
-                "is_exchange": is_exchange,
-                "exchange": matched_exchange,
-                "direction": direction,
-                "time": tx.get("time", ""),
-            })
-        except Exception:
-            continue
+        # Only fetch next page if we got a full page (50 txs)
+        if len(txs) < 50:
+            break
 
-    # Build summary
+    if not whale_txs:
+        return None
+
+    # Calculate metrics
+    total_whale_volume = sum(t["value_usd"] for t in whale_txs)
+    whale_count_100k = sum(1 for t in whale_txs if t["value_usd"] >= 100000)
+    whale_count_1m = sum(1 for t in whale_txs if t["value_usd"] >= 1000000)
+    whale_count_10m = sum(1 for t in whale_txs if t["value_usd"] >= 10000000)
+    exchange_txs = [t for t in whale_txs if t["is_exchange"]]
+
+    # Sort by value descending
+    whale_txs.sort(key=lambda t: t["value_usd"], reverse=True)
+
     return {
         "whale_tx_count_100k": whale_count_100k,
         "whale_tx_count_1m": whale_count_1m,
         "whale_tx_count_10m": whale_count_10m,
         "total_whale_volume_usd": round(total_whale_volume, 2),
-        "avg_whale_tx_value_usd": round(total_whale_volume / len(whale_txs), 2) if whale_txs else 0,
+        "avg_whale_tx_value_usd": round(total_whale_volume / len(whale_txs), 2),
         "top_transactions": whale_txs[:10],
-        "exchange_related_count": sum(1 for t in whale_txs if t["is_exchange"]),
+        "exchange_related_count": len(exchange_txs),
+        "exchange_names": list(set(t["exchange"] for t in exchange_txs if t["exchange"])),
         "sample_size": len(whale_txs),
+        "confirmed_tx_count": sum(1 for t in whale_txs if t["confirmations"] > 0),
     }
 
 
@@ -360,7 +366,7 @@ def main():
     chain_data = fetch_blockchair()
     print(f"  Chain: {chain_data['transactions_24h']} tx/24h | mempool: {chain_data['mempool_transactions']}")
 
-    whale_data = fetch_whale_transactions()
+    whale_data = fetch_whale_transactions(price_data.get("price_usd", 0.07))
     if whale_data:
         print(f"  Whale: {whale_data['whale_tx_count_100k']} tx>$100K | "
               f"{whale_data['whale_tx_count_1m']} tx>$1M | "
