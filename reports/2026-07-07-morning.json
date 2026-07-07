@@ -1,14 +1,14 @@
 {
-  "timestamp": "2026-07-07T10:04:12.324815+08:00",
+  "timestamp": "2026-07-07T10:06:10.372823+08:00",
   "type": "morning",
   "price": {
-    "price_usd": 0.076084,
+    "price_usd": 0.076076,
     "price_btc": 1.19e-06,
-    "change_24h_pct": -2.03571,
-    "change_7d_pct": 5.06632,
-    "change_30d_pct": -8.7402,
-    "market_cap_usd": 11790308082,
-    "volume_24h_usd": 753115904,
+    "change_24h_pct": -2.04627,
+    "change_7d_pct": 5.055,
+    "change_30d_pct": -8.75004,
+    "market_cap_usd": 11788591019,
+    "volume_24h_usd": 752321990,
     "market_cap_rank": 11,
     "ath_usd": 0.731578,
     "ath_date": "2021-05-08T05:08:23.458Z",
@@ -21,15 +21,15 @@
     "max_supply": null
   },
   "chain": {
-    "blocks": 6279254,
-    "transactions_24h": 28681,
-    "circulation": 1.5496503638370521e+19,
-    "difficulty": 44329484.389413,
-    "hashrate_24h": "3070865871428310",
-    "mempool_transactions": 68,
-    "mempool_size": 56796,
-    "mempool_tps": 0.18333333333333332,
-    "mempool_total_fee_usd": 0.8452,
+    "blocks": 6279256,
+    "transactions_24h": 28640,
+    "circulation": 1.5496505638370521e+19,
+    "difficulty": 40483552.220428,
+    "hashrate_24h": "2804444062353474",
+    "mempool_transactions": 72,
+    "mempool_size": 52641,
+    "mempool_tps": 0.7333333333333333,
+    "mempool_total_fee_usd": 0.969,
     "average_transaction_fee_24h_usd": null,
     "median_transaction_fee_24h_usd": null,
     "fee_24h_usd": null,
@@ -40,27 +40,27 @@
   "whale": {
     "status": "ok",
     "activity_level": "低迷",
-    "summary": "最大单笔：$812,191；无百万级以上转账，巨鲸按兵不动",
-    "whale_tx_count_100k": 2,
+    "summary": "最大单笔$63,923",
+    "whale_tx_count_100k": 0,
     "whale_tx_count_1m": 0,
     "whale_tx_count_10m": 0,
-    "total_whale_volume_usd": 1403946.14,
-    "avg_whale_tx_value_usd": 467982.05,
-    "exchange_related_count": 2,
-    "largest_tx_usd": 812191.48
+    "total_whale_volume_usd": 63923.48,
+    "avg_whale_tx_value_usd": 63923.48,
+    "largest_tx_usd": 63923.48,
+    "mempool_whale_count": 1
   },
   "analysis": {
-    "summary": "短线走弱，观望为主；巨鲸：低迷，最大单笔：$812,191；无百万级以上转账，巨鲸按兵不动",
+    "summary": "短线走弱，观望为主；巨鲸：低迷，最大单笔$63,923",
     "phase": "窄幅整理，等待方向选择",
-    "support": 0.07076,
-    "resistance": 0.08141,
+    "support": 0.07075,
+    "resistance": 0.0814,
     "major_support": 0.06695,
     "major_resistance": 0.08521,
     "key_indicators": {
       "vol_mcap_ratio": 6.4,
-      "transactions_24h": 28681,
-      "hashrate_24h": "3070865871428310",
-      "mempool_txs": 68
+      "transactions_24h": 28640,
+      "hashrate_24h": "2804444062353474",
+      "mempool_txs": 72
     }
   }
 }
