@@ -1,0 +1,54 @@
+{
+  "timestamp": "2026-07-07T09:46:25.878363+08:00",
+  "type": "morning",
+  "price": {
+    "price_usd": 0.075985,
+    "price_btc": 1.19e-06,
+    "change_24h_pct": -2.66789,
+    "change_7d_pct": 3.67284,
+    "change_30d_pct": -7.08373,
+    "market_cap_usd": 11774408585,
+    "volume_24h_usd": 753499491,
+    "market_cap_rank": 11,
+    "ath_usd": 0.731578,
+    "ath_date": "2021-05-08T05:08:23.458Z",
+    "atl_usd": 8.69e-05,
+    "atl_date": "2015-05-06T00:00:00.000Z",
+    "high_24h_usd": 0.078067,
+    "low_24h_usd": 0.074517,
+    "circulating_supply": 154964396383.7052,
+    "total_supply": 154964696383.7052,
+    "max_supply": null
+  },
+  "chain": {
+    "blocks": 6421275,
+    "transactions_24h": 28653,
+    "circulation": 1.7067683312657908e+19,
+    "difficulty": 41616121.84922572,
+    "hashrate_24h": "2882901269054497",
+    "mempool_transactions": 70,
+    "mempool_size": 51655,
+    "mempool_tps": 0.7333333333333333,
+    "mempool_total_fee_usd": 0.3146,
+    "average_transaction_fee_24h_usd": null,
+    "median_transaction_fee_24h_usd": null,
+    "fee_24h_usd": null,
+    "largest_transaction_24h_usd": null,
+    "nodes": 518,
+    "outputs_24h": null
+  },
+  "analysis": {
+    "summary": "短线走弱，观望为主",
+    "phase": "窄幅整理，等待方向选择",
+    "support": 0.07067,
+    "resistance": 0.0813,
+    "major_support": 0.06687,
+    "major_resistance": 0.0851,
+    "key_indicators": {
+      "vol_mcap_ratio": 6.4,
+      "transactions_24h": 28653,
+      "hashrate_24h": "2882901269054497",
+      "mempool_txs": 70
+    }
+  }
+}
