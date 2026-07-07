@@ -118,37 +118,46 @@ function analyze(p, c) {
   if (vr > 0.12) phase += '，换手率高';
   else if (vr < 0.03) phase += '，换手率极低，变盘在即';
 
-  // Whale score (0-100)
+  // ── Whale score (0-100) ──────────────────────────────
   let score = 0, ws = [];
-  if (lt > 10000000)  { score += 30; ws.push(`最大单笔${F(lt)}，千万级巨鲸出动`); }
-  else if (lt > 5000000) { score += 22; ws.push(`最大单笔${F(lt)}`); }
-  else if (lt > 1000000) { score += 15; ws.push(`最大转账${F(lt)}`); }
-  else if (lt > 100000)  { score += 8; }
 
-  const eat = tx24 > 0 ? vol / tx24 : 0;
-  if (eat > 50000)   { score += 20; ws.push(`均笔${F(eat)}，大单占比高`); }
-  else if (eat > 10000) { score += 12; }
-  else if (eat > 5000)  { score += 6; }
+  // 1. Largest single tx (most reliable indicator)
+  if (lt > 10000000)       { score += 35; ws.push(`最大单笔${F(lt)}，千万级巨鲸出动`); }
+  else if (lt > 5000000)   { score += 28; ws.push(`最大单笔${F(lt)}，大额转账`); }
+  else if (lt > 1000000)   { score += 20; ws.push(`最大单笔${F(lt)}`); }
+  else if (lt > 100000)    { score += 12; ws.push(`有${F(lt)}转账`); }
+  else if (lt > 0)         { score += 4;  ws.push(`最大转账仅${F(lt)}`); }
+  else                      { ws.push('暂无大额转账记录'); }
 
-  if (vr > 0.12)      { score += 20; ws.push(`换手率${(vr*100).toFixed(1)}%，资金频繁进出`); }
-  else if (vr > 0.07)  { score += 12; }
-  else if (vr > 0.04)  { score += 6; }
+  // 2. Fee pressure (whales pay priority fees)
+  if (fee24 > 50000)       { score += 20; ws.push(`手续费${F(fee24)}，网络重度使用`); }
+  else if (fee24 > 20000)  { score += 14; ws.push(`手续费${F(fee24)}，网络较繁忙`); }
+  else if (fee24 > 5000)   { score += 7; }
+  else if (fee24 > 0)      { score += 3; }
 
-  if (af && mf && mf > 0 && af/mf > 2) { score += 15; ws.push('手续费分布不均，大额优先费增加'); }
-  if (memp > 100) { score += 10; ws.push(`Mempool ${memp}笔待处理`); }
-  else if (memp > 50) { score += 5; }
-  if (fee24 > 20000) { score += 10; ws.push(`总手续费${F(fee24)}，网络繁忙`); }
-  else if (fee24 > 5000) { score += 5; }
-  if (tx24 > 50000) { score += 10; ws.push(`日交易${tx24.toLocaleString()}笔，高度活跃`); }
-  else if (tx24 > 30000) { score += 5; }
+  // 3. Fee distribution skew (avg >> median = whales overpaying)
+  if (af && mf && mf > 0 && af / mf > 3)      { score += 15; ws.push('手续费严重不均，疑似巨鲸抢块'); }
+  else if (af && mf && mf > 0 && af / mf > 2) { score += 8; }
 
+  // 4. Mempool congestion
+  if (memp > 200)      { score += 12; ws.push(`Mempool拥堵(${memp}笔待处理)`); }
+  else if (memp > 100) { score += 7; ws.push(`Mempool ${memp}笔待处理`); }
+  else if (memp > 50)  { score += 3; }
+
+  // 5. Transaction count (chain usage)
+  if (tx24 > 60000)       { score += 12; ws.push(`日交易${(tx24/1000).toFixed(0)}k笔，链上火爆`); }
+  else if (tx24 > 40000)  { score += 7; }
+  else if (tx24 > 20000)  { score += 3; }
+
+  // ── Activity label ───────────────────────────────────
   let wlvl;
-  if (score >= 65) wlvl = '高度活跃 🔥🔥';
-  else if (score >= 40) wlvl = '温和活跃 🔥';
-  else if (score >= 20) wlvl = '有动静';
-  else wlvl = '低迷 💤';
+  if (lt <= 0 && score < 15)  wlvl = '链上安静 💤';
+  else if (score >= 60)       wlvl = '高度活跃 🔥🔥';
+  else if (score >= 35)       wlvl = '温和活跃 🔥';
+  else if (score >= 15)       wlvl = '有动静';
+  else                         wlvl = '低迷 💤';
 
-  if (ws.length === 0) ws.push(`近24h链上安静。最大转账${F(lt)}`);
+  if (ws.length === 0) ws.push('近24h链上无明显活动');
 
   const sup   = +(price * 0.93).toFixed(5);
   const res   = +(price * 1.07).toFixed(5);
@@ -161,7 +170,7 @@ function analyze(p, c) {
     whale: {
       status:'ok', activity_level: wlvl, activity_score: score,
       summary: ws.join('；'), largest_tx_24h_usd: lt,
-      est_avg_tx_usd: +eat.toFixed(0), fee_total_24h_usd: fee24,
+      fee_total_24h_usd: fee24,
       avg_fee_usd: af, vol_mcap_ratio_pct: +(vr*100).toFixed(1),
       mempool_count: memp, tx_count_24h: tx24,
     }
@@ -224,7 +233,7 @@ function render(p, c, a, liveTime) {
       </div>
       <div class="grid">
         <div class="metric"><div class="label">最大单笔</div><div class="value" style="color:#ff6b6b;font-size:16px;">${F(w.largest_tx_24h_usd)}</div></div>
-        <div class="metric"><div class="label">估算均笔</div><div class="value">${F(w.est_avg_tx_usd)}</div></div>
+        <div class="metric"><div class="label">总手续费</div><div class="value">${F(w.fee_total_24h_usd)}</div></div>
         <div class="metric"><div class="label">换手率</div><div class="value">${w.vol_mcap_ratio_pct}%</div></div>
         <div class="metric"><div class="label">Mempool</div><div class="value">${w.mempool_count}笔</div></div>
       </div>
