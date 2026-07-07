@@ -92,7 +92,7 @@ function saveCache(p, c) {
 }
 
 // ── Analysis engine ─────────────────────────────────────
-function analyze(p, c) {
+function analyze(p, c, cache) {
   const price = p.price_usd || 0;
   const ch24  = p.change_24h_pct || 0;
   const ch7d  = p.change_7d_pct || 0;
@@ -103,9 +103,9 @@ function analyze(p, c) {
   const memp  = c.mempool_transactions || 0;
   const fee24 = c.fee_24h_usd || 0;
   const lt    = c.largest_transaction_24h_usd || 0;
-  const outp  = c.outputs_24h || 0;
-  const af    = c.average_transaction_fee_24h_usd || 0;
-  const mf    = c.median_transaction_fee_24h_usd || 0;
+  const cdd   = c.cdd_24h || 0;
+  const hodl  = c.hodling_addresses || 0;
+  const sfpb  = c.suggested_fee_per_byte || 0;
 
   // Phase
   let phase;
@@ -118,46 +118,76 @@ function analyze(p, c) {
   if (vr > 0.12) phase += '，换手率高';
   else if (vr < 0.03) phase += '，换手率极低，变盘在即';
 
-  // ── Whale score (0-100) ──────────────────────────────
+  // ── Whale Score (0-100) ──────────────────────────────
   let score = 0, ws = [];
 
-  // 1. Largest single tx (most reliable indicator)
-  if (lt > 10000000)       { score += 35; ws.push(`最大单笔${F(lt)}，千万级巨鲸出动`); }
-  else if (lt > 5000000)   { score += 28; ws.push(`最大单笔${F(lt)}，大额转账`); }
-  else if (lt > 1000000)   { score += 20; ws.push(`最大单笔${F(lt)}`); }
-  else if (lt > 100000)    { score += 12; ws.push(`有${F(lt)}转账`); }
-  else if (lt > 0)         { score += 4;  ws.push(`最大转账仅${F(lt)}`); }
-  else                      { ws.push('暂无大额转账记录'); }
+  // ─── 1. 币天销毁 CDD（最高权重 0-30） ─────────────────
+  const cddPerTx = tx24 > 0 ? cdd / tx24 : 0;
+  const cacheCDD = (cache && cache.c && cache.c.cdd_24h) ? cache.c.cdd_24h : cdd;
 
-  // 2. Fee pressure (whales pay priority fees)
-  if (fee24 > 50000)       { score += 20; ws.push(`手续费${F(fee24)}，网络重度使用`); }
-  else if (fee24 > 20000)  { score += 14; ws.push(`手续费${F(fee24)}，网络较繁忙`); }
-  else if (fee24 > 5000)   { score += 7; }
-  else if (fee24 > 0)      { score += 3; }
+  if (cdd > cacheCDD * 3 && cdd > 1e10) {
+    ws.push(`⚠️ CDD暴涨，老币在移动`);
+  } else if (cdd > cacheCDD * 1.5 && cdd > 1e9) {
+    score += 5; ws.push(`CDD上升，部分老币苏醒`);
+  } else if (cdd < cacheCDD * 0.5 && cacheCDD > 0) {
+    score += 25; ws.push(`🟢 CDD骤降，老币沉睡（囤币信号强）`);
+  } else if (cddPerTx < 50000) {
+    score += 20; ws.push('🟢 CDD极低，全网惜售');
+  } else if (cddPerTx < 200000) {
+    score += 12; ws.push('CDD偏低，持币倾向于不动');
+  } else if (cddPerTx < 500000) {
+    score += 5;
+  }
 
-  // 3. Fee distribution skew (avg >> median = whales overpaying)
-  if (af && mf && mf > 0 && af / mf > 3)      { score += 15; ws.push('手续费严重不均，疑似巨鲸抢块'); }
-  else if (af && mf && mf > 0 && af / mf > 2) { score += 8; }
+  // ─── 2. 持币地址数（0-20） ────────────────────────────
+  const cacheHodl = (cache && cache.c && cache.c.hodling_addresses) ? cache.c.hodling_addresses : hodl;
+  const hodlChange = cacheHodl > 0 ? (hodl - cacheHodl) / cacheHodl : 0;
 
-  // 4. Mempool congestion
-  if (memp > 200)      { score += 12; ws.push(`Mempool拥堵(${memp}笔待处理)`); }
-  else if (memp > 100) { score += 7; ws.push(`Mempool ${memp}笔待处理`); }
-  else if (memp > 50)  { score += 3; }
+  if (hodlChange > 0.01) {
+    score += 18; ws.push(`🟢 持币地址+${(hodlChange*100).toFixed(1)}%，分散吸筹`);
+  } else if (hodlChange > 0.003) {
+    score += 12; ws.push(`持币地址+${(hodlChange*100).toFixed(2)}%，缓慢增长`);
+  } else if (hodlChange > 0) {
+    score += 6;
+  } else if (hodlChange < -0.01) {
+    ws.push(`持币地址-${Math.abs(hodlChange*100).toFixed(1)}%，散户离场`);
+  }
 
-  // 5. Transaction count (chain usage)
-  if (tx24 > 60000)       { score += 12; ws.push(`日交易${(tx24/1000).toFixed(0)}k笔，链上火爆`); }
-  else if (tx24 > 40000)  { score += 7; }
-  else if (tx24 > 20000)  { score += 3; }
+  // ─── 3. 费率拥堵度（0-15） ────────────────────────────
+  if (sfpb > 1000000) {
+    score += 15; ws.push(`🔥 费率极高，链上抢块激烈`);
+  } else if (sfpb > 500000) {
+    score += 10; ws.push(`费率偏高，网络繁忙`);
+  } else if (sfpb > 200000) {
+    score += 5;
+  }
+
+  // ─── 4. 总手续费（0-10） ──────────────────────────────
+  if (fee24 > 50000)       { score += 10; ws.push(`手续费${F(fee24)}，重度使用`); }
+  else if (fee24 > 20000)  { score += 7; ws.push(`手续费${F(fee24)}，较繁忙`); }
+  else if (fee24 > 5000)   { score += 4; }
+
+  // ─── 5. 最大单笔转账（0-15，降低权重） ─────────────────
+  if (lt > 10000000)       { score += 15; ws.push(`最大单笔${F(lt)}`); }
+  else if (lt > 1000000)   { score += 10; ws.push(`最大转账${F(lt)}`); }
+  else if (lt > 100000)    { score += 5; }
+  // Self-transfer: huge tx + tiny CDD = likely wallet housekeeping
+  if (lt > 5000000 && cddPerTx < 100000 && tx24 > 0) {
+    ws.push('⚠️ 大额但CDD极低，疑钱包整理');
+  }
+
+  // ─── 6. Mempool + TX（0-10） ─────────────────────────
+  if (memp > 200)   { score += 5; ws.push(`Mempool拥堵(${memp}笔)`); }
+  if (tx24 > 50000) { score += 5; ws.push(`日交易${(tx24/1000).toFixed(0)}k笔`); }
 
   // ── Activity label ───────────────────────────────────
   let wlvl;
-  if (lt <= 0 && score < 15)  wlvl = '链上安静 💤';
-  else if (score >= 60)       wlvl = '高度活跃 🔥🔥';
-  else if (score >= 35)       wlvl = '温和活跃 🔥';
-  else if (score >= 15)       wlvl = '有动静';
-  else                         wlvl = '低迷 💤';
+  if (score >= 65)      wlvl = '高度活跃 🔥🔥';
+  else if (score >= 40) wlvl = '温和活跃 🔥';
+  else if (score >= 20) wlvl = '有动静';
+  else                   wlvl = '低迷 💤';
 
-  if (ws.length === 0) ws.push('近24h链上无明显活动');
+  if (ws.length === 0) ws.push('链上无显著信号');
 
   const sup   = +(price * 0.93).toFixed(5);
   const res   = +(price * 1.07).toFixed(5);
@@ -171,8 +201,13 @@ function analyze(p, c) {
       status:'ok', activity_level: wlvl, activity_score: score,
       summary: ws.join('；'), largest_tx_24h_usd: lt,
       fee_total_24h_usd: fee24,
-      avg_fee_usd: af, vol_mcap_ratio_pct: +(vr*100).toFixed(1),
+      avg_fee_usd: c.average_transaction_fee_24h_usd || 0,
+      vol_mcap_ratio_pct: +(vr*100).toFixed(1),
       mempool_count: memp, tx_count_24h: tx24,
+      cdd_24h: cdd,
+      hodling_addresses: hodl,
+      hodl_change_pct: +(hodlChange * 100).toFixed(3),
+      suggested_fee_per_byte: sfpb,
     }
   };
 }
@@ -229,10 +264,16 @@ function render(p, c, a, liveTime) {
       <div class="card-title">🐋 巨鲸动向 <span style="font-size:11px;color:#888;">(实时评分)</span></div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
         <div style="font-size:24px;font-weight:800;color:#fff;">${w.activity_level}</div>
-        <div style="font-size:11px;color:#888;padding:2px 8px;background:rgba(255,255,255,0.05);border-radius:10px;">活跃指数 ${w.activity_score}/100</div>
+        <div style="font-size:11px;color:#888;padding:2px 8px;background:rgba(255,255,255,0.05);border-radius:10px;">活跃 ${w.activity_score}/100</div>
       </div>
       <div class="grid">
-        <div class="metric"><div class="label">最大单笔</div><div class="value" style="color:#ff6b6b;font-size:16px;">${F(w.largest_tx_24h_usd)}</div></div>
+        <div class="metric"><div class="label">币天销毁CDD</div><div class="value" style="color:${(w.cdd_24h||0) < 1e9 ? '#4caf50' : '#f5a623'};font-size:15px;">${(w.cdd_24h/1e9).toFixed(2)}B</div></div>
+        <div class="metric"><div class="label">持币地址</div><div class="value" style="font-size:15px;">${(w.hodling_addresses/1e6).toFixed(2)}M</div></div>
+        <div class="metric"><div class="label">地址变化</div><div class="value" style="color:${(w.hodl_change_pct||0)>=0?'#4caf50':'#f44336'}">${(w.hodl_change_pct||0)>=0?'+':''}${w.hodl_change_pct}%</div></div>
+        <div class="metric"><div class="label">费率</div><div class="value">${(w.suggested_fee_per_byte/1e6).toFixed(2)}M</div></div>
+      </div>
+      <div class="grid" style="margin-top:4px;">
+        <div class="metric"><div class="label">最大单笔</div><div class="value" style="color:#ff6b6b;">${F(w.largest_tx_24h_usd)}</div></div>
         <div class="metric"><div class="label">总手续费</div><div class="value">${F(w.fee_total_24h_usd)}</div></div>
         <div class="metric"><div class="label">换手率</div><div class="value">${w.vol_mcap_ratio_pct}%</div></div>
         <div class="metric"><div class="label">Mempool</div><div class="value">${w.mempool_count}笔</div></div>
@@ -305,6 +346,10 @@ function parseBC(bc) {
     average_transaction_fee_24h_usd: d.average_transaction_fee_24h_usd || 0,
     median_transaction_fee_24h_usd: d.median_transaction_fee_24h_usd || 0,
     hashrate_24h: d.hashrate_24h || 'N/A',
+    // New fields
+    cdd_24h: d.cdd_24h || 0,
+    hodling_addresses: d.hodling_addresses || 0,
+    suggested_fee_per_byte: d.suggested_transaction_fee_per_byte_sat || 0,
   };
 }
 
@@ -313,7 +358,7 @@ async function main() {
   // 1. Show cached data immediately (instant render)
   const cache = loadCache();
   if (cache) {
-    const a = analyze(cache.p, cache.c);
+    const a = analyze(cache.p, cache.c, null);
     const t = new Date(cache._ts).toLocaleString('zh-CN');
     render(cache.p, cache.c, a, t + ' (缓存)');
   }
@@ -348,7 +393,7 @@ async function main() {
   }
 
   // 3. Render fresh data
-  const a = analyze(p, c);
+  const a = analyze(p, c, cache);
   render(p, c, a, now);
 }
 
