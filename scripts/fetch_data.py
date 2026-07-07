@@ -77,7 +77,7 @@ def fetch_blockchair():
         "average_transaction_fee_24h_usd": data.get("average_transaction_fee_24h_usd"),
         "median_transaction_fee_24h_usd": data.get("median_transaction_fee_24h_usd"),
         "fee_24h_usd": data.get("fee_24h_usd"),
-        "largest_transaction_24h_usd": data.get("largest_transaction_24h_usd"),
+        "largest_transaction_24h_usd": (data.get("largest_transaction_24h") or {}).get("value_usd", 0),
         "nodes": data.get("nodes"),
         "outputs_24h": data.get("outputs_24h"),
     }

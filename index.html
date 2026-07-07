@@ -300,7 +300,7 @@ function parseBC(bc) {
     fee_24h_usd: d.fee_24h_usd || 0,
     mempool_transactions: d.mempool_transactions || 0,
     nodes: d.nodes || 0,
-    largest_transaction_24h_usd: d.largest_transaction_24h_usd || 0,
+    largest_transaction_24h_usd: (d.largest_transaction_24h && d.largest_transaction_24h.value_usd) || 0,
     outputs_24h: d.outputs_24h || 0,
     average_transaction_fee_24h_usd: d.average_transaction_fee_24h_usd || 0,
     median_transaction_fee_24h_usd: d.median_transaction_fee_24h_usd || 0,
