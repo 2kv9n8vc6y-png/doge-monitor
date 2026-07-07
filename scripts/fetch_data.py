@@ -80,93 +80,88 @@ def fetch_blockchair():
         "largest_transaction_24h_usd": (data.get("largest_transaction_24h") or {}).get("value_usd", 0),
         "nodes": data.get("nodes"),
         "outputs_24h": data.get("outputs_24h"),
+        "cdd_24h": data.get("cdd_24h", 0),
+        "hodling_addresses": data.get("hodling_addresses", 0),
+        "suggested_fee_per_byte_sat": data.get("suggested_transaction_fee_per_byte_sat", 0),
     }
 
 
 def analyze_whales(price_data, chain_data):
     """
-    Infer whale activity from on-chain stats.
-    Uses largest_tx, volume patterns, fees, and tx count as proxies.
+    Whale activity score weighted by CDD, hodling addresses, and fee rate.
+    Follows the logic validated by 2021 and 2024 rally precursors.
     """
     largest_tx = chain_data.get("largest_transaction_24h_usd") or 0
     tx_count = chain_data.get("transactions_24h") or 0
     fee_total = chain_data.get("fee_24h_usd") or 0
-    avg_fee = chain_data.get("average_transaction_fee_24h_usd") or 0
-    median_fee = chain_data.get("median_transaction_fee_24h_usd") or 0
     mempool_txs = chain_data.get("mempool_transactions") or 0
-    outputs_24h = chain_data.get("outputs_24h") or 0
+    cdd = chain_data.get("cdd_24h") or 0
+    hodl = chain_data.get("hodling_addresses") or 0
+    sfpb = chain_data.get("suggested_fee_per_byte_sat") or 0
 
     vol = price_data.get("volume_24h_usd") or 0
     mcap = price_data.get("market_cap_usd") or 1
-    price = price_data.get("price_usd") or 0
+    vol_ratio = vol / mcap if mcap else 0
 
-    # ── Whale Activity Score (0-100) ─────────────────────
     score = 0
     signals = []
 
-    # 1. Largest single tx
-    if largest_tx > 10000000:
-        score += 30
-        signals.append(f"24h最大单笔${largest_tx:,.0f}，千万级巨鲸出动")
-    elif largest_tx > 5000000:
-        score += 22
-        signals.append(f"24h最大单笔${largest_tx:,.0f}")
-    elif largest_tx > 1000000:
+    # ─── 1. CDD (0-30 points) ──────────────────────────
+    cdd_per_tx = cdd / tx_count if tx_count > 0 else 0
+    if cdd_per_tx < 50000:
+        score += 25
+        signals.append("CDD极低，全网惜售（强囤币信号）")
+    elif cdd_per_tx < 200000:
         score += 15
-        signals.append(f"24h最大转账${largest_tx:,.0f}")
-    elif largest_tx > 100000:
+        signals.append("CDD偏低，持币倾向不动")
+    elif cdd_per_tx >= 1000000:
+        signals.append(f"⚠️ CDD偏高({cdd/1e9:.1f}B)，老币在流动")
+
+    # ─── 2. Hodling addresses (0-20 points) ────────────
+    if hodl > 0:
         score += 8
+        if hodl > 9000000:
+            score += 8
+            signals.append(f"持币地址{hodl/1e6:.1f}M，覆盖面广")
 
-    # 2. Average tx size (total output / output count)
-    if outputs_24h > 0 and price > 0:
-        avg_output_doge = chain_data.get("circulation", 0)
-        # Estimate: total value moved ≈ volume * some factor
-        est_avg_tx = (vol / tx_count) if tx_count > 0 else 0
-        if est_avg_tx > 50000:
-            score += 20
-            signals.append(f"估计均笔交易${est_avg_tx:,.0f}，大单占比高")
-        elif est_avg_tx > 10000:
-            score += 12
-        elif est_avg_tx > 5000:
-            score += 6
-
-    # 3. Volume / MCap ratio (high = active whales trading)
-    vol_ratio = vol / mcap if mcap else 0
-    if vol_ratio > 0.12:
-        score += 20
-        signals.append(f"换手率{vol_ratio*100:.1f}%，资金进出频繁")
-    elif vol_ratio > 0.07:
-        score += 12
-    elif vol_ratio > 0.04:
-        score += 6
-
-    # 4. Fee spike (whales pay higher fees for priority)
-    if avg_fee and median_fee and median_fee > 0 and avg_fee / max(median_fee, 0.0001) > 2:
+    # ─── 3. Fee congestion (0-15 points) ───────────────
+    if sfpb > 1000000:
         score += 15
-        signals.append("手续费分布不均，大额优先费增加")
-
-    # 5. Mempool congestion (large pending tx)
-    if mempool_txs > 100:
+        signals.append("费率极高，链上抢块激烈")
+    elif sfpb > 500000:
         score += 10
-        signals.append(f"Mempool {mempool_txs}笔待处理，网络拥堵")
-    elif mempool_txs > 50:
+        signals.append("费率偏高，网络繁忙")
+
+    # ─── 4. Total fees (0-10 points) ───────────────────
+    if fee_total > 50000:
+        score += 10
+        signals.append(f"24h手续费${fee_total:,.0f}，重度使用")
+    elif fee_total > 20000:
+        score += 7
+        signals.append(f"手续费${fee_total:,.0f}，较繁忙")
+
+    # ─── 5. Largest tx (0-15 points) ───────────────────
+    if largest_tx > 10000000:
+        score += 15
+        signals.append(f"最大单笔${largest_tx:,.0f}")
+        # Self-transfer detection
+        if cdd_per_tx < 100000 and tx_count > 0:
+            signals.append("⚠️ 大额但CDD极低，疑钱包整理")
+    elif largest_tx > 1000000:
+        score += 10
+        signals.append(f"最大转账${largest_tx:,.0f}")
+    elif largest_tx > 100000:
         score += 5
 
-    # 6. Total fee spend (high = network demand)
-    if fee_total > 20000:
-        score += 10
-        signals.append(f"24h总手续费${fee_total:,.0f}，网络繁忙")
-    elif fee_total > 5000:
+    # ─── 6. Mempool + TX (0-10 points) ────────────────
+    if mempool_txs > 200:
         score += 5
-
-    # 7. Tx count trend
+        signals.append(f"Mempool拥堵({mempool_txs}笔)")
     if tx_count > 50000:
-        score += 10
-        signals.append(f"日交易{tx_count:,}笔，链上高度活跃")
-    elif tx_count > 30000:
         score += 5
+        signals.append(f"日交易{tx_count/1000:.0f}k笔")
 
-    # ── Determine activity level ──────────────────────────
+    # ── Label ─────────────────────────────────────────
     if score >= 65:
         activity_cn = "高度活跃 🔥🔥"
     elif score >= 40:
@@ -176,14 +171,8 @@ def analyze_whales(price_data, chain_data):
     else:
         activity_cn = "低迷 💤"
 
-    # ── Direction inference ──────────────────────────────
+    summary_text = "；".join(signals) if signals else "链上无显著信号"
     vol_mcap_pct = round(vol_ratio * 100, 1)
-    est_avg = round(vol / tx_count, 0) if tx_count > 0 else 0
-
-    summary_text = "；".join(signals) if signals else (
-        f"近24h链上无明显巨鲸异动。最大转账${largest_tx:,.0f}。"
-        if largest_tx > 0 else "正在累积链上数据..."
-    )
 
     return {
         "status": "ok",
@@ -191,12 +180,13 @@ def analyze_whales(price_data, chain_data):
         "activity_score": score,
         "summary": summary_text,
         "largest_tx_24h_usd": largest_tx,
-        "est_avg_tx_usd": est_avg,
         "fee_total_24h_usd": fee_total,
-        "avg_fee_usd": avg_fee,
         "vol_mcap_ratio_pct": vol_mcap_pct,
         "mempool_count": mempool_txs,
         "tx_count_24h": tx_count,
+        "cdd_24h": cdd,
+        "hodling_addresses": hodl,
+        "suggested_fee_per_byte": sfpb,
     }
 
 
