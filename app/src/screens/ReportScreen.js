@@ -13,7 +13,7 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 
 // Default URL — replace YOUR_USERNAME with your GitHub username
 const DEFAULT_REPORT_URL =
-  "https://raw.githubusercontent.com/2kv9n8vc6y-png/doge-monitor/main/public/latest.json";
+  "https://raw.githubusercontent.com/2kv9n8vc6y-png/doge-monitor/master/public/latest.json";
 
 export default function ReportScreen({ notification, onClearNotification }) {
   const [report, setReport] = useState(null);
