@@ -59,14 +59,36 @@
 // ── Live API sources ────────────────────────────────────
 const CG_URL  = 'https://api.coingecko.com/api/v3/coins/dogecoin?localization=false&tickers=false&community_data=false&developer_data=false';
 const BC_URL  = 'https://api.blockchair.com/dogecoin/stats';
+const CACHE_KEY = 'doge_monitor_cache';
+const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
 
 // ── Helpers ─────────────────────────────────────────────
 const F = n => { if (!n && n!==0) return '-'; if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if (n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if (n>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toFixed(2); };
 
-async function fetchJSON(url) {
-  const r = await fetch(url, { cache: 'no-cache' });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+async function fetchWithTimeout(url, ms=8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { cache: 'no-cache', signal: ctrl.signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally { clearTimeout(timer); }
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (Date.now() - d._ts > CACHE_MAX_AGE) return null;
+    return d;
+  } catch { return null; }
+}
+
+function saveCache(p, c) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ p, c, _ts: Date.now() }));
+  } catch {}
 }
 
 // ── Analysis engine ─────────────────────────────────────
@@ -243,59 +265,82 @@ function render(p, c, a, liveTime) {
   `;
 }
 
+// ── Parse CoinGecko response ────────────────────────────
+function parseCG(cg) {
+  const m = cg.market_data || {};
+  return {
+    price_usd: m.current_price?.usd,
+    change_24h_pct: m.price_change_percentage_24h,
+    change_7d_pct: m.price_change_percentage_7d,
+    change_30d_pct: m.price_change_percentage_30d,
+    market_cap_usd: m.market_cap?.usd,
+    volume_24h_usd: m.total_volume?.usd,
+    market_cap_rank: cg.market_cap_rank,
+    ath_usd: m.ath?.usd,
+    atl_usd: m.atl?.usd,
+    high_24h_usd: m.high_24h?.usd,
+    low_24h_usd: m.low_24h?.usd,
+    circulating_supply: m.circulating_supply,
+  };
+}
+
+function parseBC(bc) {
+  const d = (bc && bc.data) ? bc.data : {};
+  return {
+    transactions_24h: d.transactions_24h || 0,
+    fee_24h_usd: d.fee_24h_usd || 0,
+    mempool_transactions: d.mempool_transactions || 0,
+    nodes: d.nodes || 0,
+    largest_transaction_24h_usd: d.largest_transaction_24h_usd || 0,
+    outputs_24h: d.outputs_24h || 0,
+    average_transaction_fee_24h_usd: d.average_transaction_fee_24h_usd || 0,
+    median_transaction_fee_24h_usd: d.median_transaction_fee_24h_usd || 0,
+    hashrate_24h: d.hashrate_24h || 'N/A',
+  };
+}
+
 // ── Main ────────────────────────────────────────────────
 async function main() {
+  // 1. Show cached data immediately (instant render)
+  const cache = loadCache();
+  if (cache) {
+    const a = analyze(cache.p, cache.c);
+    const t = new Date(cache._ts).toLocaleString('zh-CN');
+    render(cache.p, cache.c, a, t + ' (缓存)');
+  }
+
+  // 2. Fetch fresh data with timeout
   const now = new Date().toLocaleString('zh-CN');
+  let p = cache ? cache.p : null;
+  let c = cache ? cache.c : null;
 
   try {
     const [cg, bc] = await Promise.all([
-      fetchJSON(CG_URL),
-      fetchJSON(BC_URL).catch(() => null)
+      fetchWithTimeout(CG_URL, 10000),
+      fetchWithTimeout(BC_URL, 8000).catch(() => null)
     ]);
 
-    const p = {
-      price_usd: cg.market_data?.current_price?.usd,
-      price_btc: cg.market_data?.current_price?.btc,
-      change_24h_pct: cg.market_data?.price_change_percentage_24h,
-      change_7d_pct: cg.market_data?.price_change_percentage_7d,
-      change_30d_pct: cg.market_data?.price_change_percentage_30d,
-      market_cap_usd: cg.market_data?.market_cap?.usd,
-      volume_24h_usd: cg.market_data?.total_volume?.usd,
-      market_cap_rank: cg.market_cap_rank,
-      ath_usd: cg.market_data?.ath?.usd,
-      atl_usd: cg.market_data?.atl?.usd,
-      high_24h_usd: cg.market_data?.high_24h?.usd,
-      low_24h_usd: cg.market_data?.low_24h?.usd,
-      circulating_supply: cg.market_data?.circulating_supply,
-      total_supply: cg.market_data?.total_supply,
-      max_supply: cg.market_data?.max_supply,
-    };
-
-    const bcData = (bc && bc.data) ? bc.data : {};
-    const c = {
-      transactions_24h: bcData.transactions_24h || 0,
-      fee_24h_usd: bcData.fee_24h_usd || 0,
-      mempool_transactions: bcData.mempool_transactions || 0,
-      nodes: bcData.nodes || 0,
-      largest_transaction_24h_usd: bcData.largest_transaction_24h_usd || 0,
-      outputs_24h: bcData.outputs_24h || 0,
-      average_transaction_fee_24h_usd: bcData.average_transaction_fee_24h_usd || 0,
-      median_transaction_fee_24h_usd: bcData.median_transaction_fee_24h_usd || 0,
-      hashrate_24h: bcData.hashrate_24h || 'N/A',
-    };
-
-    const a = analyze(p, c);
-    render(p, c, a, now);
+    p = parseCG(cg);
+    c = parseBC(bc);
+    saveCache(p, c);
 
   } catch(e) {
+    // If we have cache, just show it — silently fail
+    if (cache) return;
+    // No cache + API fail = show error
     document.getElementById('app').innerHTML = `
       <div class="error">
         <div class="big">🐕‍🦺</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">API 限流</div>
-        <div style="font-size:14px;color:#888;margin-bottom:16px;">${e.message}<br>CoinGecko 免费 API 每分钟限制 10-30 次，请稍后再试</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">网络超时</div>
+        <div style="font-size:14px;color:#888;margin-bottom:16px;">${e.message}<br>请检查网络后重试</div>
         <button class="refresh-btn" onclick="location.reload()">重试</button>
       </div>`;
+    return;
   }
+
+  // 3. Render fresh data
+  const a = analyze(p, c);
+  render(p, c, a, now);
 }
 
 main();
