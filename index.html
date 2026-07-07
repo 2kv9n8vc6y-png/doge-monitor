@@ -8,317 +8,293 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0f0f23;
-    color: #e0e0e0;
-    min-height: 100vh;
-    padding-bottom: 40px;
+    background: #0f0f23; color: #e0e0e0; min-height: 100vh; padding-bottom: 40px;
   }
-  .header {
-    text-align: center;
-    padding: 24px 16px 8px;
-  }
+  .header { text-align: center; padding: 24px 16px 8px; }
   .header .emoji { font-size: 48px; }
   .header h1 { color: #f5a623; font-size: 22px; margin: 8px 0; }
   .header .time { color: #888; font-size: 13px; }
-
-  .card {
-    background: #1a1a2e;
-    border-radius: 16px;
-    padding: 16px;
-    margin: 12px 16px;
-    border: 1px solid #2a2a4a;
-  }
+  .live-badge { display: inline-block; background: #4caf50; color: #fff; font-size: 10px; padding: 2px 8px; border-radius: 10px; margin-left: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .card { background: #1a1a2e; border-radius: 16px; padding: 16px; margin: 12px 16px; border: 1px solid #2a2a4a; }
   .card-title { color: #f5a623; font-size: 15px; font-weight: 700; margin-bottom: 12px; }
-
-  .price-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 14px;
-  }
+  .price-row { display: flex; align-items: center; margin-bottom: 14px; }
   .price-value { color: #fff; font-size: 36px; font-weight: 800; flex: 1; }
-  .change-badge {
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #fff;
-  }
+  .change-badge { padding: 6px 12px; border-radius: 20px; font-size: 15px; font-weight: 700; color: #fff; }
   .change-up { background: #1b5e20; }
   .change-down { background: #b71c1c; }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    margin-bottom: 8px;
-  }
-  .metric {
-    text-align: center;
-    padding: 8px 4px;
-  }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+  .metric { text-align: center; padding: 8px 4px; }
   .metric .label { color: #888; font-size: 10px; margin-bottom: 4px; }
   .metric .value { color: #e0e0e0; font-size: 13px; font-weight: 600; }
-
-  .phase-box {
-    background: rgba(245,166,35,0.12);
-    border: 1px solid rgba(245,166,35,0.3);
-    border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 12px;
-    text-align: center;
-  }
+  .phase-box { background: rgba(245,166,35,0.12); border: 1px solid rgba(245,166,35,0.3); border-radius: 12px; padding: 12px; margin-bottom: 12px; text-align: center; }
   .phase-text { color: #f5a623; font-size: 15px; font-weight: 700; }
   .summary-text { color: #bbb; font-size: 14px; line-height: 1.7; margin-bottom: 12px; }
-
-  .levels {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-  .level {
-    border-radius: 12px;
-    padding: 12px;
-    text-align: center;
-  }
+  .levels { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .level { border-radius: 12px; padding: 12px; text-align: center; }
   .level.support { background: rgba(76,175,80,0.1); border: 1px solid rgba(76,175,80,0.2); }
   .level.resist { background: rgba(244,67,54,0.1); border: 1px solid rgba(244,67,54,0.2); }
   .level .lbl { font-size: 13px; color: #ccc; margin-bottom: 4px; }
   .level .val { font-size: 18px; font-weight: 800; color: #fff; }
-
-  .pills {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .pill {
-    background: rgba(255,255,255,0.05);
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 12px;
-    color: #ccc;
-  }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .pill { background: rgba(255,255,255,0.05); border-radius: 20px; padding: 6px 12px; font-size: 12px; color: #ccc; }
   .pill b { color: #e0e0e0; }
-
-  .footer {
-    text-align: center;
-    padding: 20px 16px;
-    color: #555;
-    font-size: 11px;
-    line-height: 1.6;
-  }
-
-  .refresh-bar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px;
-    color: #888;
-    font-size: 13px;
-  }
-  .refresh-btn {
-    background: #f5a623;
-    color: #1a1a2e;
-    border: none;
-    border-radius: 20px;
-    padding: 8px 20px;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-  }
+  .footer { text-align: center; padding: 20px 16px; color: #555; font-size: 11px; line-height: 1.6; }
+  .refresh-bar { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; color: #888; font-size: 13px; }
+  .refresh-btn { background: #f5a623; color: #1a1a2e; border: none; border-radius: 20px; padding: 10px 24px; font-size: 14px; font-weight: 700; cursor: pointer; }
   .refresh-btn:active { opacity: 0.8; }
-
-  .loading {
-    text-align: center;
-    padding: 60px 20px;
-    color: #888;
-  }
-  .loading .spinner {
-    display: inline-block;
-    width: 40px;
-    height: 40px;
-    border: 3px solid #2a2a4a;
-    border-top-color: #f5a623;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-    margin-bottom: 12px;
-  }
+  .loading { text-align: center; padding: 60px 20px; color: #888; }
+  .spinner { display: inline-block; width: 40px; height: 40px; border: 3px solid #2a2a4a; border-top-color: #f5a623; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
   .error { text-align: center; padding: 60px 20px; color: #f44336; }
   .error .big { font-size: 48px; margin-bottom: 12px; }
+  .age-bar { text-align: center; font-size: 11px; color: #555; padding: 4px; }
 </style>
 </head>
 <body>
-
 <div id="app">
-  <div class="loading">
-    <div class="spinner"></div>
-    <div>加载中...</div>
-  </div>
+  <div class="loading"><div class="spinner"></div><div>抓取实时数据...</div></div>
 </div>
-
 <script>
-const REPORT_URL = 'https://raw.githubusercontent.com/2kv9n8vc6y-png/doge-monitor/master/public/latest.json';
+// ── Live API sources ────────────────────────────────────
+const CG_URL  = 'https://api.coingecko.com/api/v3/coins/dogecoin?localization=false&tickers=false&community_data=false&developer_data=false';
+const BC_URL  = 'https://api.blockchair.com/dogecoin/stats';
 
-function formatNum(n) {
-  if (n == null) return '-';
-  if (n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
-  if (n >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
-  if (n >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return '$' + (n/1e3).toFixed(2) + 'K';
-  return '$' + n.toFixed(2);
+// ── Helpers ─────────────────────────────────────────────
+const F = n => { if (!n && n!==0) return '-'; if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if (n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if (n>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toFixed(2); };
+
+async function fetchJSON(url) {
+  const r = await fetch(url, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
 }
 
-async function fetchReport() {
-  const resp = await fetch(REPORT_URL, { cache: 'no-cache' });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return resp.json();
+// ── Analysis engine ─────────────────────────────────────
+function analyze(p, c) {
+  const price = p.price_usd || 0;
+  const ch24  = p.change_24h_pct || 0;
+  const ch7d  = p.change_7d_pct || 0;
+  const vol   = p.volume_24h_usd || 0;
+  const mcap  = p.market_cap_usd || 1;
+  const vr    = vol / mcap;
+  const tx24  = c.transactions_24h || 0;
+  const memp  = c.mempool_transactions || 0;
+  const fee24 = c.fee_24h_usd || 0;
+  const lt    = c.largest_transaction_24h_usd || 0;
+  const outp  = c.outputs_24h || 0;
+  const af    = c.average_transaction_fee_24h_usd || 0;
+  const mf    = c.median_transaction_fee_24h_usd || 0;
+
+  // Phase
+  let phase;
+  if (ch24 > 5) phase = '短期强势上涨，关注能否放量突破';
+  else if (ch24 > 2) phase = '短线企稳反弹';
+  else if (ch24 < -5) phase = '短期急跌，关注下方支撑';
+  else if (ch24 < -2) phase = '短线走弱，观望为主';
+  else phase = '短线横盘震荡，等待方向选择';
+
+  if (vr > 0.12) phase += '，换手率高';
+  else if (vr < 0.03) phase += '，换手率极低，变盘在即';
+
+  // Whale score (0-100)
+  let score = 0, ws = [];
+  if (lt > 10000000)  { score += 30; ws.push(`最大单笔${F(lt)}，千万级巨鲸出动`); }
+  else if (lt > 5000000) { score += 22; ws.push(`最大单笔${F(lt)}`); }
+  else if (lt > 1000000) { score += 15; ws.push(`最大转账${F(lt)}`); }
+  else if (lt > 100000)  { score += 8; }
+
+  const eat = tx24 > 0 ? vol / tx24 : 0;
+  if (eat > 50000)   { score += 20; ws.push(`均笔${F(eat)}，大单占比高`); }
+  else if (eat > 10000) { score += 12; }
+  else if (eat > 5000)  { score += 6; }
+
+  if (vr > 0.12)      { score += 20; ws.push(`换手率${(vr*100).toFixed(1)}%，资金频繁进出`); }
+  else if (vr > 0.07)  { score += 12; }
+  else if (vr > 0.04)  { score += 6; }
+
+  if (af && mf && mf > 0 && af/mf > 2) { score += 15; ws.push('手续费分布不均，大额优先费增加'); }
+  if (memp > 100) { score += 10; ws.push(`Mempool ${memp}笔待处理`); }
+  else if (memp > 50) { score += 5; }
+  if (fee24 > 20000) { score += 10; ws.push(`总手续费${F(fee24)}，网络繁忙`); }
+  else if (fee24 > 5000) { score += 5; }
+  if (tx24 > 50000) { score += 10; ws.push(`日交易${tx24.toLocaleString()}笔，高度活跃`); }
+  else if (tx24 > 30000) { score += 5; }
+
+  let wlvl;
+  if (score >= 65) wlvl = '高度活跃 🔥🔥';
+  else if (score >= 40) wlvl = '温和活跃 🔥';
+  else if (score >= 20) wlvl = '有动静';
+  else wlvl = '低迷 💤';
+
+  if (ws.length === 0) ws.push(`近24h链上安静。最大转账${F(lt)}`);
+
+  const sup   = +(price * 0.93).toFixed(5);
+  const res   = +(price * 1.07).toFixed(5);
+  const msup  = +(price * 0.88).toFixed(5);
+  const mres  = +(price * 1.12).toFixed(5);
+
+  return {
+    phase, sup, res, msup, mres,
+    vr_pct: +(vr * 100).toFixed(1),
+    whale: {
+      status:'ok', activity_level: wlvl, activity_score: score,
+      summary: ws.join('；'), largest_tx_24h_usd: lt,
+      est_avg_tx_usd: +eat.toFixed(0), fee_total_24h_usd: fee24,
+      avg_fee_usd: af, vol_mcap_ratio_pct: +(vr*100).toFixed(1),
+      mempool_count: memp, tx_count_24h: tx24,
+    }
+  };
 }
 
-function render(report) {
-  const p = report.price;
-  const c = report.chain;
-  const a = report.analysis;
-  const w = report.whale || {};
-  const change = p.change_24h_pct || 0;
-  const isUp = change >= 0;
-  const emoji = report.type === 'morning' ? '☀️' : '🌙';
-  const label = report.type === 'morning' ? 'DOGE 早报' : 'DOGE 晚报';
-  const ts = new Date(report.timestamp).toLocaleString('zh-CN');
+// ── Render ──────────────────────────────────────────────
+function render(p, c, a, liveTime) {
+  const ch24 = p.change_24h_pct || 0, isUp = ch24 >= 0;
+  const w = a.whale;
 
   document.getElementById('app').innerHTML = `
     <div class="header">
       <div class="emoji">🐕</div>
-      <h1>${emoji} ${label}</h1>
-      <div class="time">${ts}</div>
+      <h1>DOGE 实时看板 <span class="live-badge">LIVE</span></h1>
+      <div class="time">数据时间: ${liveTime}</div>
     </div>
 
     <div class="card">
       <div class="card-title">💰 价格</div>
       <div class="price-row">
         <div class="price-value">$${p.price_usd?.toFixed(5) || 'N/A'}</div>
-        <div class="change-badge ${isUp ? 'change-up' : 'change-down'}">
-          ${isUp ? '+' : ''}${change.toFixed(2)}%
-        </div>
+        <div class="change-badge ${isUp?'change-up':'change-down'}">${isUp?'+':''}${ch24.toFixed(2)}%</div>
       </div>
       <div class="grid">
-        <div class="metric"><div class="label">24h高</div><div class="value">$${p.high_24h_usd?.toFixed(5) || '-'}</div></div>
-        <div class="metric"><div class="label">24h低</div><div class="value">$${p.low_24h_usd?.toFixed(5) || '-'}</div></div>
-        <div class="metric"><div class="label">7日</div><div class="value" style="color:${(p.change_7d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_7d_pct?.toFixed(1) || '-'}%</div></div>
-        <div class="metric"><div class="label">30日</div><div class="value" style="color:${(p.change_30d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_30d_pct?.toFixed(1) || '-'}%</div></div>
+        <div class="metric"><div class="label">24h高</div><div class="value">$${p.high_24h_usd?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">24h低</div><div class="value">$${p.low_24h_usd?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">7日</div><div class="value" style="color:${(p.change_7d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_7d_pct?.toFixed(1)||'-'}%</div></div>
+        <div class="metric"><div class="label">30日</div><div class="value" style="color:${(p.change_30d_pct||0)>=0?'#4caf50':'#f44336'}">${p.change_30d_pct?.toFixed(1)||'-'}%</div></div>
       </div>
       <div class="grid">
-        <div class="metric"><div class="label">市值</div><div class="value">${formatNum(p.market_cap_usd)}</div></div>
-        <div class="metric"><div class="label">排名</div><div class="value">#${p.market_cap_rank || '-'}</div></div>
-        <div class="metric"><div class="label">24h量</div><div class="value">${formatNum(p.volume_24h_usd)}</div></div>
-        <div class="metric"><div class="label">流通量</div><div class="value">${(p.circulating_supply/1e9)?.toFixed(1) || '-'}B</div></div>
+        <div class="metric"><div class="label">市值</div><div class="value">${F(p.market_cap_usd)}</div></div>
+        <div class="metric"><div class="label">排名</div><div class="value">#${p.market_cap_rank||'-'}</div></div>
+        <div class="metric"><div class="label">24h量</div><div class="value">${F(p.volume_24h_usd)}</div></div>
+        <div class="metric"><div class="label">流通量</div><div class="value">${(p.circulating_supply/1e9)?.toFixed(1)||'-'}B</div></div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">⛓️ 链上数据</div>
       <div class="grid">
-        <div class="metric"><div class="label">24h交易</div><div class="value">${c.transactions_24h?.toLocaleString() || '-'}</div></div>
-        <div class="metric"><div class="label">手续费</div><div class="value">$${c.fee_24h_usd?.toFixed(0) || '-'}</div></div>
-        <div class="metric"><div class="label">Mempool</div><div class="value">${c.mempool_transactions?.toLocaleString() || '-'}</div></div>
-        <div class="metric"><div class="label">节点</div><div class="value">${c.nodes?.toLocaleString() || '-'}</div></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">🐋 巨鲸动向</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <div style="font-size:24px;font-weight:800;color:#fff;">${w.activity_level || '分析中...'}</div>
-        <div style="font-size:11px;color:#888;padding:2px 8px;background:rgba(255,255,255,0.05);border-radius:10px;">活跃指数 ${w.activity_score || 0}/100</div>
+        <div class="metric"><div class="label">24h交易</div><div class="value">${(c.transactions_24h||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="label">手续费</div><div class="value">$${(c.fee_24h_usd||0).toFixed(0)}</div></div>
+        <div class="metric"><div class="label">Mempool</div><div class="value">${(c.mempool_transactions||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="label">节点</div><div class="value">${(c.nodes||0).toLocaleString()}</div></div>
       </div>
       <div class="grid">
-        <div class="metric"><div class="label">最大单笔</div><div class="value" style="color:#ff6b6b;font-size:16px;">${formatNum(w.largest_tx_24h_usd)}</div></div>
-        <div class="metric"><div class="label">估算均笔</div><div class="value">${formatNum(w.est_avg_tx_usd)}</div></div>
-        <div class="metric"><div class="label">换手率</div><div class="value">${w.vol_mcap_ratio_pct || 0}%</div></div>
-        <div class="metric"><div class="label">Mempool</div><div class="value">${w.mempool_count || 0}笔</div></div>
-      </div>
-      <div class="grid" style="margin-top:4px;">
-        <div class="metric"><div class="label">日交易数</div><div class="value">${(w.tx_count_24h || 0).toLocaleString()}</div></div>
-        <div class="metric"><div class="label">总手续费</div><div class="value">$${(w.fee_total_24h_usd || 0).toFixed(0)}</div></div>
-        <div class="metric"><div class="label">平均手续费</div><div class="value">$${(w.avg_fee_usd || 0).toFixed(4)}</div></div>
-        <div class="metric"><div class="label">数据置信</div><div class="value" style="color:#4caf50;">链上统计</div></div>
-      </div>
-      <div style="margin-top:10px;padding:10px;background:rgba(245,166,35,0.06);border-radius:10px;font-size:13px;color:#ccc;line-height:1.6;">
-        ${w.summary || '正在分析链上数据...'}
+        <div class="metric"><div class="label">平均手续费</div><div class="value">$${(c.average_transaction_fee_24h_usd||0).toFixed(4)}</div></div>
+        <div class="metric"><div class="label">最大转账</div><div class="value">${F(c.largest_transaction_24h_usd)}</div></div>
+        <div class="metric"><div class="label">24h输出</div><div class="value">${(c.outputs_24h||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="label">算力</div><div class="value">${(c.hashrate_24h||'N/A')}</div></div>
       </div>
     </div>
 
     <div class="card">
-      <div class="card-title">🧠 分析</div>
-      <div class="phase-box">
-        <div class="phase-text">${a.phase}</div>
+      <div class="card-title">🐋 巨鲸动向 <span style="font-size:11px;color:#888;">(实时评分)</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="font-size:24px;font-weight:800;color:#fff;">${w.activity_level}</div>
+        <div style="font-size:11px;color:#888;padding:2px 8px;background:rgba(255,255,255,0.05);border-radius:10px;">活跃指数 ${w.activity_score}/100</div>
       </div>
-      <div class="summary-text">${a.summary}</div>
+      <div class="grid">
+        <div class="metric"><div class="label">最大单笔</div><div class="value" style="color:#ff6b6b;font-size:16px;">${F(w.largest_tx_24h_usd)}</div></div>
+        <div class="metric"><div class="label">估算均笔</div><div class="value">${F(w.est_avg_tx_usd)}</div></div>
+        <div class="metric"><div class="label">换手率</div><div class="value">${w.vol_mcap_ratio_pct}%</div></div>
+        <div class="metric"><div class="label">Mempool</div><div class="value">${w.mempool_count}笔</div></div>
+      </div>
+      <div style="margin-top:10px;padding:10px;background:rgba(245,166,35,0.06);border-radius:10px;font-size:13px;color:#ccc;line-height:1.6;">
+        ${w.summary}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🧠 阶段判断</div>
+      <div class="phase-box"><div class="phase-text">${a.phase}</div></div>
       <div class="levels">
-        <div class="level support">
-          <div class="lbl">🟢 支撑位</div>
-          <div class="val">$${a.support?.toFixed(5)}</div>
-        </div>
-        <div class="level resist">
-          <div class="lbl">🔴 阻力位</div>
-          <div class="val">$${a.resistance?.toFixed(5)}</div>
-        </div>
+        <div class="level support"><div class="lbl">🟢 支撑位</div><div class="val">$${a.sup}</div></div>
+        <div class="level resist"><div class="lbl">🔴 阻力位</div><div class="val">$${a.res}</div></div>
       </div>
       <div class="levels">
-        <div class="level support">
-          <div class="lbl">🟢 强支撑</div>
-          <div class="val">$${a.major_support?.toFixed(5)}</div>
-        </div>
-        <div class="level resist">
-          <div class="lbl">🔴 强阻力</div>
-          <div class="val">$${a.major_resistance?.toFixed(5)}</div>
-        </div>
-      </div>
-      <div class="pills">
-        <div class="pill">换手率 <b>${a.key_indicators?.vol_mcap_ratio}%</b></div>
-        <div class="pill">链上TX <b>${a.key_indicators?.transactions_24h?.toLocaleString() || '-'}</b></div>
-        <div class="pill">Mempool <b>${a.key_indicators?.mempool_txs?.toLocaleString() || '-'}</b></div>
+        <div class="level support"><div class="lbl">🟢 强支撑</div><div class="val">$${a.msup}</div></div>
+        <div class="level resist"><div class="lbl">🔴 强阻力</div><div class="val">$${a.mres}</div></div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">📜 历史对比</div>
       <div class="grid">
-        <div class="metric"><div class="label">ATH</div><div class="value">$${p.ath_usd?.toFixed(4) || '-'}</div></div>
-        <div class="metric"><div class="label">距ATH</div><div class="value" style="color:#f44336">${p.ath_usd ? ((p.price_usd/p.ath_usd - 1)*100).toFixed(0) : '-'}%</div></div>
-        <div class="metric"><div class="label">ATL</div><div class="value">$${p.atl_usd?.toFixed(6) || '-'}</div></div>
-        <div class="metric"><div class="label">距ATL</div><div class="value" style="color:#4caf50">${p.atl_usd ? ((p.price_usd/p.atl_usd - 1)*100).toFixed(0) : '-'}%</div></div>
+        <div class="metric"><div class="label">ATH</div><div class="value">$${p.ath_usd?.toFixed(4)||'-'}</div></div>
+        <div class="metric"><div class="label">距ATH</div><div class="value" style="color:#f44336">${p.ath_usd?((p.price_usd/p.ath_usd-1)*100).toFixed(0):'-'}%</div></div>
+        <div class="metric"><div class="label">ATL</div><div class="value">$${p.atl_usd?.toFixed(6)||'-'}</div></div>
+        <div class="metric"><div class="label">距ATL</div><div class="value" style="color:#4caf50">${p.atl_usd?((p.price_usd/p.atl_usd-1)*100).toFixed(0):'-'}%</div></div>
       </div>
     </div>
 
     <div class="refresh-bar">
-      <span id="updateTime">更新于 ${ts}</span>
-      <button class="refresh-btn" onclick="location.reload()">🔄 刷新</button>
+      <button class="refresh-btn" onclick="location.reload()">🔄 刷新实时数据</button>
     </div>
 
-    <div class="footer">
-      数据来源: CoinGecko + Blockchair<br>
-      自动更新 · 仅供参考 · 不构成投资建议<br>
-      <span style="font-size:10px">github.com/2kv9n8vc6y-png/doge-monitor</span>
-    </div>
+    <div class="age-bar" id="ageBar">数据 ${liveTime} 抓取</div>
+    <div class="footer">CoinGecko + Blockchair 实时 · 仅供参考 · 不构成投资建议</div>
   `;
 }
 
+// ── Main ────────────────────────────────────────────────
 async function main() {
+  const now = new Date().toLocaleString('zh-CN');
+
   try {
-    const report = await fetchReport();
-    render(report);
-  } catch (e) {
+    const [cg, bc] = await Promise.all([
+      fetchJSON(CG_URL),
+      fetchJSON(BC_URL).catch(() => null)
+    ]);
+
+    const p = {
+      price_usd: cg.market_data?.current_price?.usd,
+      price_btc: cg.market_data?.current_price?.btc,
+      change_24h_pct: cg.market_data?.price_change_percentage_24h,
+      change_7d_pct: cg.market_data?.price_change_percentage_7d,
+      change_30d_pct: cg.market_data?.price_change_percentage_30d,
+      market_cap_usd: cg.market_data?.market_cap?.usd,
+      volume_24h_usd: cg.market_data?.total_volume?.usd,
+      market_cap_rank: cg.market_cap_rank,
+      ath_usd: cg.market_data?.ath?.usd,
+      atl_usd: cg.market_data?.atl?.usd,
+      high_24h_usd: cg.market_data?.high_24h?.usd,
+      low_24h_usd: cg.market_data?.low_24h?.usd,
+      circulating_supply: cg.market_data?.circulating_supply,
+      total_supply: cg.market_data?.total_supply,
+      max_supply: cg.market_data?.max_supply,
+    };
+
+    const bcData = (bc && bc.data) ? bc.data : {};
+    const c = {
+      transactions_24h: bcData.transactions_24h || 0,
+      fee_24h_usd: bcData.fee_24h_usd || 0,
+      mempool_transactions: bcData.mempool_transactions || 0,
+      nodes: bcData.nodes || 0,
+      largest_transaction_24h_usd: bcData.largest_transaction_24h_usd || 0,
+      outputs_24h: bcData.outputs_24h || 0,
+      average_transaction_fee_24h_usd: bcData.average_transaction_fee_24h_usd || 0,
+      median_transaction_fee_24h_usd: bcData.median_transaction_fee_24h_usd || 0,
+      hashrate_24h: bcData.hashrate_24h || 'N/A',
+    };
+
+    const a = analyze(p, c);
+    render(p, c, a, now);
+
+  } catch(e) {
     document.getElementById('app').innerHTML = `
       <div class="error">
         <div class="big">🐕‍🦺</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">加载失败</div>
-        <div style="font-size:14px;color:#888;margin-bottom:16px;">${e.message}</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:8px;">API 限流</div>
+        <div style="font-size:14px;color:#888;margin-bottom:16px;">${e.message}<br>CoinGecko 免费 API 每分钟限制 10-30 次，请稍后再试</div>
         <button class="refresh-btn" onclick="location.reload()">重试</button>
-      </div>
-    `;
+      </div>`;
   }
 }
 
