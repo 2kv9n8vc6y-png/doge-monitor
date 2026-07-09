@@ -231,7 +231,7 @@ function handleTrade(t) {
     '<span class="trade-type" style="color:' + (isBuy ? '#4caf50' : '#f44336') + '">' + (isBuy ? '买' : '卖') + '</span>' +
     '<span class="trade-price" style="color:' + (isBuy ? '#4caf50' : '#f44336') + '">$' + price.toFixed(5) + '</span>' +
     '<span class="trade-qty">' + qty.toLocaleString() + '</span>' +
-    '<span class="trade-value">$' + (value/1000).toFixed(1) + 'K</span>';
+    '<span class="trade-value">' + (value >= 1000 ? '$' + (value/1000).toFixed(1) + 'K' : '$' + value.toFixed(2)) + '</span>';
   tradesEl.insertBefore(row, tradesEl.firstChild);
   while (tradesEl.children.length > MAX_TRADES) tradesEl.removeChild(tradesEl.lastChild);
 
