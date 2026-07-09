@@ -99,6 +99,7 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 
   <div id="center">
     <div id="tradeFlow"><h3>📈 实时成交流 (aggTrade)</h3><div id="trades"></div></div>
+    <div id="bigTradeBar" style="background:#111;padding:6px 12px;font-size:11px;color:#aaa;flex-shrink:0;border-top:1px solid #222;min-height:28px;">💣 大单记录：暂无</div>
     <div id="deltaBar">
       <h3>⚡ 成交量Delta (累计)</h3>
       <div id="deltaMeter"><div id="deltaFill" style="width:50%"></div></div>
@@ -140,6 +141,7 @@ const MAX_LOG = 200;
 
 let bestBid = 0, bestAsk = 0, lastPrice = 0;
 let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
+let bigTradesList = [];
 let depthBids = [], depthAsks = [];
 let alerts = [], logLines = [];
 let wsConnected = false;
@@ -208,9 +210,15 @@ function handleTrade(t) {
   const isBig = value >= BIG_TRADE_THRESH;
   if (isBig) {
     bigTrades++;
-    const dir = isBuy ? '🟢 大额吃单' : '🔴 大额砸盘';
-    addAlert(isBuy ? 'bigBuy' : 'bigSell',
-      dir + ' | ' + qty.toLocaleString() + ' DOGE ($' + (value/1000).toFixed(0) + 'K) @ $' + price.toFixed(5) + ' | ' + time);
+    const dir = isBuy ? '🟢 吃单' : '🔴 砸盘';
+    const detail = dir + ' ' + qty.toLocaleString() + ' DOGE ($' + (value/1000).toFixed(0) + 'K) @ $' + price.toFixed(5);
+    addAlert(isBuy ? 'bigBuy' : 'bigSell', detail + ' | ' + time);
+    // Update big trade bar
+    const bar = document.getElementById('bigTradeBar');
+    const existing = bigTradesList.length > 0 ? bigTradesList.map(function(t) { return t.detail + ' ' + t.time; }).join(' | ') : '';
+    bigTradesList.unshift({ detail: detail, time: time });
+    if (bigTradesList.length > 6) bigTradesList.pop();
+    bar.innerHTML = '💣 大单记录：' + bigTradesList.map(function(t) { return t.detail + ' ' + t.time; }).join(' ｜ ');
   }
 
   // Update delta meter
