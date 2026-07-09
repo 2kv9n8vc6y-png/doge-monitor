@@ -84,7 +84,7 @@ const CACHE_KEY = 'doge_monitor_cache';
 const DEPTH_KEY = 'doge_depth_snapshot';
 const CACHE_MAX_AGE = 5 * 60 * 1000;
 const BN_DEPTH_URL = 'https://api.binance.com/api/v3/depth?symbol=DOGEUSDT&limit=25';
-const FALLBACK_URL = 'https://raw.githubusercontent.com/2kv9n8vc6y-png/doge-monitor/master/public/latest.json';
+const FALLBACK_URL = 'public/latest.json';
 
 // ── Helpers ─────────────────────────────────────────────
 const F = n => { if (!n && n!==0) return '-'; if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if (n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if (n>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toFixed(2); };
