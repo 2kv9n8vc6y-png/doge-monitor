@@ -159,36 +159,6 @@ if (bigTradesList.length > 0) {
   }, 500);
 }
 
-// Fetch historical big trades on wakeup (Binance REST)
-async function fetchRecentBigTrades() {
-  try {
-    var r = await fetch('https://api.binance.com/api/v3/aggTrades?symbol=DOGEUSDT&limit=200');
-    var trades = await r.json();
-    var wokeBig = [];
-    for (var i = 0; i < trades.length; i++) {
-      var t = trades[i];
-      var price = parseFloat(t.p);
-      var qty = parseFloat(t.q);
-      var value = price * qty;
-      if (value >= BIG_TRADE_THRESH) {
-        var time = new Date(t.T).toLocaleTimeString('zh-CN');
-        var isBuy = !t.m;
-        var dir = isBuy ? '🟢 吃单' : '🔴 砸盘';
-        wokeBig.push({ detail: dir + ' ' + qty.toLocaleString() + ' DOGE ($' + (value/1000).toFixed(0) + 'K) @ $' + price.toFixed(5), time: time });
-      }
-    }
-    // Merge with existing, deduplicate by time+detail
-    wokeBig.forEach(function(nb) {
-      var dup = bigTradesList.some(function(old) { return old.time === nb.time && old.detail === nb.detail; });
-      if (!dup) bigTradesList.unshift(nb);
-    });
-    bigTradesList = bigTradesList.slice(0, 6);
-    saveBigTrades();
-    var bar = document.getElementById('bigTradeBar');
-    if (bar) bar.innerHTML = '💣 大单记录：' + bigTradesList.map(function(t) { return t.detail + ' ' + t.time; }).join(' ｜ ');
-    log('Wakeup: fetched ' + wokeBig.length + ' missed big trades');
-  } catch(e) { log('Wakeup fetch failed: ' + e.message); }
-}
 let prevDepthBidWall = 0, prevDepthAskWall = 0;
 let curKline = { open:0, high:0, low:0, volume:0 };
 
@@ -448,11 +418,6 @@ fetchChainData();
 setInterval(fetchChainData, 60000);
 
 // Wakeup detection: fetch missed big trades when laptop wakes from sleep
-document.addEventListener('visibilitychange', function() {
-  if (!document.hidden && wsConnected) {
-    fetchRecentBigTrades();
-  }
-});
 </script>
 </body>
 </html>
