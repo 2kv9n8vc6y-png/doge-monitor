@@ -85,7 +85,7 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 <div id="app">
   <div id="priceBar">
     <div><span class="ticker" id="price">---</span> <span class="change" id="change">---</span></div>
-    <div class="info">高 <span id="high">---</span> | 低 <span id="low">---</span> | 量 <span id="vol">---</span></div>
+    <div class="info">VWAP <span id="vwapVal" style="color:#f5a623;">---</span> | 高 <span id="high">---</span> | 低 <span id="low">---</span> | 量 <span id="vol">---</span></div>
     <div class="info">链上: <span id="chainTx">---</span>tx/24h | CDD <span id="miniCdd">---</span> | 地址 <span id="miniHodl">---</span></div>
     <div><span class="status live" id="wsStatus">LIVE</span> <span class="info" id="updateTime">---</span></div>
   </div>
@@ -141,6 +141,7 @@ const MAX_LOG = 200;
 
 let bestBid = 0, bestAsk = 0, lastPrice = 0;
 let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
+let vwapCumPV = 0, vwapCumVol = 0, vwapPrice = 0;
 let bigTradesList = [];
 let depthBids = [], depthAsks = [];
 let alerts = [], logLines = [];
@@ -190,7 +191,16 @@ function handleTrade(t) {
   const isBuy = !t.m; // m=false means buyer is the aggressor (market buy)
 
   lastPrice = price;
-  $('price').textContent = '$' + price.toFixed(5);
+
+  // VWAP accumulation
+  vwapCumPV += price * qty;
+  vwapCumVol += qty;
+  vwapPrice = vwapCumVol > 0 ? vwapCumPV / vwapCumVol : 0;
+  const vwapDiff = vwapPrice > 0 ? ((price - vwapPrice) / vwapPrice * 100) : 0;
+
+  $('price').innerHTML = '$' + price.toFixed(5) +
+    ' <span style="font-size:12px;color:' + (vwapDiff >= 0 ? '#4caf50' : '#f44336') + '">vs VWAP ' + (vwapDiff >= 0 ? '+' : '') + vwapDiff.toFixed(3) + '%</span>';
+  $('vwapVal').textContent = '$' + vwapPrice.toFixed(5);
 
   const pct = ((price - (curKline.open || price)) / (curKline.open || price) * 100).toFixed(2);
   const chgEl = $('change');
@@ -278,6 +288,13 @@ function handleDepth(d) {
   }
   if (prevDepthAskWall > 0 && maxAskQty > prevDepthAskWall * 1.5) {
     addAlert('bigSell', '🔴 卖单墙加厚！' + maxAskQty.toLocaleString() + ' DOGE @ $' + maxAsk[0].toFixed(5));
+  }
+  // Wall disappearance (wall was thick, now shrunk to <30% of previous)
+  if (prevDepthBidWall > 500000 && maxBidQty < prevDepthBidWall * 0.3) {
+    addAlert('bigSell', '⚠️ 买单墙消失！从 ' + prevDepthBidWall.toLocaleString() + ' 缩到 ' + maxBidQty.toLocaleString() + ' DOGE，托底可能撤了');
+  }
+  if (prevDepthAskWall > 500000 && maxAskQty < prevDepthAskWall * 0.3) {
+    addAlert('bigBuy', '🚀 卖单墙消失！从 ' + prevDepthAskWall.toLocaleString() + ' 缩到 ' + maxAskQty.toLocaleString() + ' DOGE，压盘可能撤了，注意突破');
   }
   prevDepthBidWall = maxBidQty;
   prevDepthAskWall = maxAskQty;
