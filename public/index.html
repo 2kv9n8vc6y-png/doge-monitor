@@ -56,6 +56,27 @@
   <div class="loading"><div class="spinner"></div><div>抓取实时数据...</div></div>
 </div>
 <script>
+// Debug: confirm JS execution
+console.log('[DOGE] Script start');
+
+// Global error catcher
+window.onerror = function(msg, src, line) {
+  document.getElementById('app').innerHTML = '<div class="error"><div class="big">⚠️</div><div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#f44336;">脚本错误</div><div style="font-size:13px;color:#888;">' + msg + '<br>行: ' + line + '</div><button class="refresh-btn" onclick="location.reload()" style="margin-top:16px;">重试</button></div>';
+};
+
+// Global timeout: if main() doesn't finish in 30s, force fallback
+setTimeout(function() {
+  var el = document.getElementById('app');
+  if (el && el.innerHTML.indexOf('spinner') > -1) {
+    var cache = loadCache();
+    if (cache) {
+      console.log('[DOGE] Forcing cache render after timeout');
+      var a = analyze(cache.p, cache.c, null);
+      render(cache.p, cache.c, a, new Date(cache._ts).toLocaleString('zh-CN') + ' (超时缓存)', 'loaded');
+    }
+  }
+}, 30000);
+
 // ── Live API sources ────────────────────────────────────
 const CG_URL  = 'https://api.coingecko.com/api/v3/coins/dogecoin?localization=false&tickers=false&community_data=false&developer_data=false';
 const BC_URL  = 'https://api.blockchair.com/dogecoin/stats';
