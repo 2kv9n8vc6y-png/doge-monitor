@@ -300,9 +300,13 @@ function analyze(p, c, cache) {
 }
 
 // ── Render ──────────────────────────────────────────────
-function render(p, c, a, liveTime) {
+function render(p, c, a, liveTime, depthState) {
   const ch24 = p.change_24h_pct || 0, isUp = ch24 >= 0;
   const w = a.whale;
+  const d = w.depth;
+  const depthOk = d && d.status === 'ok';
+  const depthFailed = d && d.status === 'no_data';
+  const depthLoading = !d && depthState === 'loading';
 
   document.getElementById('app').innerHTML = `
     <div class="header">
@@ -370,42 +374,39 @@ function render(p, c, a, liveTime) {
       </div>
     </div>
 
-    ${w.depth && w.depth.status === 'ok' ? `
     <div class="card">
       <div class="card-title">📊 盘口深度 <span style="font-size:11px;color:#888;">(Binance DOGE/USDT)</span></div>
+      ${depthOk ? `
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
-        <div style="font-size:18px;font-weight:800;color:#fff;">${w.depth.activity}</div>
-        <div style="font-size:11px;color:#888;">买卖比 ${w.depth.buyRatio}% | 价差 ${w.depth.spread_pct}%</div>
+        <div style="font-size:18px;font-weight:800;color:#fff;">${d.activity}</div>
+        <div style="font-size:11px;color:#888;">买卖比 ${d.buyRatio}% | 价差 ${d.spread_pct}%</div>
       </div>
       <div class="grid">
-        <div class="metric"><div class="label">💰 买一价</div><div class="value" style="color:#4caf50;">$${w.depth.bestBid?.toFixed(5)||'-'}</div></div>
-        <div class="metric"><div class="label">买一量(DOGE)</div><div class="value">${w.depth.bestBidQty?.toLocaleString()||'-'}</div></div>
-        <div class="metric"><div class="label">💰 卖一价</div><div class="value" style="color:#f44336;">$${w.depth.bestAsk?.toFixed(5)||'-'}</div></div>
-        <div class="metric"><div class="label">卖一量(DOGE)</div><div class="value">${w.depth.bestAskQty?.toLocaleString()||'-'}</div></div>
+        <div class="metric"><div class="label">💰 买一价</div><div class="value" style="color:#4caf50;">$${d.bestBid?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">买一量</div><div class="value">${(d.bestBidQty||0).toLocaleString()}</div></div>
+        <div class="metric"><div class="label">💰 卖一价</div><div class="value" style="color:#f44336;">$${d.bestAsk?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">卖一量</div><div class="value">${(d.bestAskQty||0).toLocaleString()}</div></div>
       </div>
       <div style="margin:8px 0;padding:8px;background:rgba(76,175,80,0.06);border-radius:8px;font-size:11px;color:#aaa;">
-        🟢 买单墙：${w.depth.maxBidWall?.qty?.toLocaleString()} DOGE @ $${w.depth.maxBidWall?.price?.toFixed(5) || '-'}
+        🟢 买单墙：${(d.maxBidWall?.qty||0).toLocaleString()} DOGE @ $${d.maxBidWall?.price?.toFixed(5) || '-'}
       </div>
       <div style="margin:8px 0;padding:8px;background:rgba(244,67,54,0.06);border-radius:8px;font-size:11px;color:#aaa;">
-        🔴 卖单墙：${w.depth.maxAskWall?.qty?.toLocaleString()} DOGE @ $${w.depth.maxAskWall?.price?.toFixed(5) || '-'}
+        🔴 卖单墙：${(d.maxAskWall?.qty||0).toLocaleString()} DOGE @ $${d.maxAskWall?.price?.toFixed(5) || '-'}
       </div>
-      ${w.depth.changes && w.depth.changes.length > 0 ? `
+      ${(d.changes||[]).length > 0 ? `
       <div style="margin-top:8px;padding:8px 10px;background:rgba(66,133,244,0.08);border-radius:8px;font-size:12px;color:#90caf9;line-height:1.6;">
-        ${w.depth.changes.map(c => c).join('<br>')}
+        ${d.changes.join('<br>')}
       </div>
       ` : ''}
       <div style="margin-top:6px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);text-align:center;font-size:11px;color:#666;">
-        每30秒采样对比 | 墙加厚50%以上触发提醒
+        刷新对比上次快照 | 墙厚+50%触发提醒
       </div>
-    </div>
-    ` : `
-    <div class="card">
-      <div class="card-title">📊 盘口深度 <span style="font-size:11px;color:#888;">(Binance DOGE/USDT)</span></div>
-      <div style="text-align:center;padding:20px;color:#888;font-size:13px;">
-        ${w.depth && w.depth.status === 'no_data' ? 'Binance API 暂不可用（国内需VPN）' : '加载中...'}
+      ` : `
+      <div style="text-align:center;padding:24px;color:#888;font-size:13px;">
+        ${depthFailed ? '⚠️ Binance API 暂不可用（需开VPN）' : depthLoading ? '⏳ 正在获取盘口数据...' : '⏳ 等待数据...'}
       </div>
+      `}
     </div>
-    `}
 
     <div class="card">
       <div class="card-title">🧠 阶段判断</div>
@@ -484,7 +485,7 @@ async function main() {
   if (cache) {
     const a = analyze(cache.p, cache.c, null);
     const t = new Date(cache._ts).toLocaleString('zh-CN');
-    render(cache.p, cache.c, a, t + ' (缓存)');
+    render(cache.p, cache.c, a, t + ' (缓存)', 'loading');
   }
 
   // 2. Fetch fresh data with timeout
@@ -494,8 +495,8 @@ async function main() {
 
   try {
     const [cg, bc, depth] = await Promise.all([
-      fetchWithTimeout(CG_URL, 10000),
-      fetchWithTimeout(BC_URL, 8000).catch(() => null),
+      fetchWithTimeout(CG_URL, 15000),
+      fetchWithTimeout(BC_URL, 10000).catch(() => null),
       fetchDepth()
     ]);
 
@@ -521,7 +522,7 @@ async function main() {
   // 3. Render fresh data
     const a = analyze(p, c, cache);
     a.whale.depth = d;
-    render(p, c, a, now);
+    render(p, c, a, now, 'loaded');
 }
 
 main();
