@@ -56,27 +56,6 @@
   <div class="loading"><div class="spinner"></div><div>抓取实时数据...</div></div>
 </div>
 <script>
-// Debug: confirm JS execution
-console.log('[DOGE] Script start');
-
-// Global error catcher
-window.onerror = function(msg, src, line) {
-  document.getElementById('app').innerHTML = '<div class="error"><div class="big">⚠️</div><div style="font-size:16px;font-weight:700;margin-bottom:8px;color:#f44336;">脚本错误</div><div style="font-size:13px;color:#888;">' + msg + '<br>行: ' + line + '</div><button class="refresh-btn" onclick="location.reload()" style="margin-top:16px;">重试</button></div>';
-};
-
-// Global timeout: if main() doesn't finish in 30s, force fallback
-setTimeout(function() {
-  var el = document.getElementById('app');
-  if (el && el.innerHTML.indexOf('spinner') > -1) {
-    var cache = loadCache();
-    if (cache) {
-      console.log('[DOGE] Forcing cache render after timeout');
-      var a = analyze(cache.p, cache.c, null);
-      render(cache.p, cache.c, a, new Date(cache._ts).toLocaleString('zh-CN') + ' (超时缓存)', 'loaded');
-    }
-  }
-}, 30000);
-
 // ── Live API sources ────────────────────────────────────
 const CG_URL  = 'https://api.coingecko.com/api/v3/coins/dogecoin?localization=false&tickers=false&community_data=false&developer_data=false';
 const BC_URL  = 'https://api.blockchair.com/dogecoin/stats';
@@ -84,7 +63,6 @@ const CACHE_KEY = 'doge_monitor_cache';
 const DEPTH_KEY = 'doge_depth_snapshot';
 const CACHE_MAX_AGE = 5 * 60 * 1000;
 const BN_DEPTH_URL = 'https://api.binance.com/api/v3/depth?symbol=DOGEUSDT&limit=25';
-const FALLBACK_URL = 'public/latest.json';
 
 // ── Helpers ─────────────────────────────────────────────
 const F = n => { if (!n && n!==0) return '-'; if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if (n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if (n>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toFixed(2); };
@@ -528,67 +506,32 @@ function parseBC(bc) {
 
 // ── Main ────────────────────────────────────────────────
 async function main() {
-  // 1. Show cached data immediately (instant render)
-  const cache = loadCache();
-  if (cache) {
-    const a = analyze(cache.p, cache.c, null);
-    const t = new Date(cache._ts).toLocaleString('zh-CN');
-    render(cache.p, cache.c, a, t + ' (缓存)', 'loading');
-  }
-
-  // 2. Fetch fresh data with timeout
   const now = new Date().toLocaleString('zh-CN');
-  let p = cache ? cache.p : null;
-  let c = cache ? cache.c : null;
 
   try {
     const [cg, bc, depth] = await Promise.all([
-      fetchWithTimeout(CG_URL, 15000),
-      fetchWithTimeout(BC_URL, 10000).catch(() => null),
+      fetchWithTimeout(CG_URL, 20000),
+      fetchWithTimeout(BC_URL, 15000).catch(() => null),
       fetchDepth()
     ]);
 
-    p = parseCG(cg);
-    c = parseBC(bc);
+    const p = parseCG(cg);
+    const c = parseBC(bc);
     saveCache(p, c);
     const d = analyzeDepth(depth, loadLastDepth());
-
-  } catch(liveErr) {
-    console.log('Live API failed, trying backup...', liveErr.message);
-
-    // Fallback: try GitHub Actions backup JSON (no VPN needed — hosted on GitHub)
-    try {
-      const fb = await fetchWithTimeout(FALLBACK_URL, 10000);
-      p = parseCG(fb);
-      c = parseBC({ data: fb.chain });
-      if (fb.whale) {
-        c.cdd_24h = fb.whale.cdd_24h || c.cdd_24h;
-        c.hodling_addresses = fb.whale.hodling_addresses || c.hodling_addresses;
-      }
-      saveCache(p, c);
-      const a = analyze(p, c, cache);
-      a.whale.depth = { status: 'no_data', note: '使用GitHub备份数据' };
-      const fbTime = fb.timestamp ? new Date(fb.timestamp).toLocaleString('zh-CN') : '备份数据';
-      render(p, c, a, fbTime + ' (备份)', 'loaded');
-      return;
-    } catch(fbErr) {
-      // Last resort: cached data or error
-      if (cache) return;
-      document.getElementById('app').innerHTML = `
-        <div class="error">
-          <div class="big">🐕‍🦺</div>
-          <div style="font-size:18px;font-weight:700;margin-bottom:8px;">无法加载数据</div>
-          <div style="font-size:14px;color:#888;margin-bottom:16px;">实时: ${liveErr.message}<br>备份: ${fbErr.message}</div>
-          <button class="refresh-btn" onclick="location.reload()">重试</button>
-        </div>`;
-      return;
-    }
-  }
-
-  // 3. Render fresh data
-    const a = analyze(p, c, cache);
+    const a = analyze(p, c, null);
     a.whale.depth = d;
     render(p, c, a, now, 'loaded');
+
+  } catch(e) {
+    document.getElementById('app').innerHTML =
+      '<div class="error">' +
+        '<div class="big">🐕‍🦺</div>' +
+        '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">API 超时</div>' +
+        '<div style="font-size:14px;color:#888;margin-bottom:16px;">' + e.message + '<br><br>CoinGecko / Blockchair 连接失败<br>请确认 VPN 已开启并刷新重试</div>' +
+        '<button class="refresh-btn" onclick="location.reload()">重试</button>' +
+      '</div>';
+  }
 }
 
 main();
