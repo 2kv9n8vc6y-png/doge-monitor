@@ -60,7 +60,9 @@
 const CG_URL  = 'https://api.coingecko.com/api/v3/coins/dogecoin?localization=false&tickers=false&community_data=false&developer_data=false';
 const BC_URL  = 'https://api.blockchair.com/dogecoin/stats';
 const CACHE_KEY = 'doge_monitor_cache';
-const CACHE_MAX_AGE = 5 * 60 * 1000; // 5 minutes
+const DEPTH_KEY = 'doge_depth_snapshot';
+const CACHE_MAX_AGE = 5 * 60 * 1000;
+const BN_DEPTH_URL = 'https://api.binance.com/api/v3/depth?symbol=DOGEUSDT&limit=25';
 
 // ── Helpers ─────────────────────────────────────────────
 const F = n => { if (!n && n!==0) return '-'; if (n>=1e12) return '$'+(n/1e12).toFixed(2)+'T'; if (n>=1e9) return '$'+(n/1e9).toFixed(2)+'B'; if (n>=1e6) return '$'+(n/1e6).toFixed(2)+'M'; if (n>=1e3) return '$'+(n/1e3).toFixed(2)+'K'; return '$'+n.toFixed(2); };
@@ -89,6 +91,91 @@ function saveCache(p, c) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ p, c, _ts: Date.now() }));
   } catch {}
+}
+
+// ── Order Book Depth ───────────────────────────────────
+async function fetchDepth() {
+  try {
+    const r = await fetchWithTimeout(BN_DEPTH_URL, 6000);
+    return { bids: r.bids || [], asks: r.asks || [] };
+  } catch { return null; }
+}
+
+function loadLastDepth() {
+  try {
+    const raw = localStorage.getItem(DEPTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveDepth(d) {
+  try { localStorage.setItem(DEPTH_KEY, JSON.stringify({ ...d, _ts: Date.now() })); } catch {}
+}
+
+function analyzeDepth(current, previous) {
+  if (!current) return { status: 'no_data' };
+
+  const parse = (arr) => arr.map(([p, q]) => [parseFloat(p), parseFloat(q)]);
+  const bids = parse(current.bids);
+  const asks = parse(current.asks);
+
+  // Top 5 levels
+  const top5Bids = bids.slice(0, 5);
+  const top5Asks = asks.slice(0, 5);
+  const bestBid = top5Bids[0] || [0,0];
+  const bestAsk = top5Asks[0] || [0,0];
+  const spread = bestBid[0] > 0 ? ((bestAsk[0] - bestBid[0]) / bestAsk[0] * 100) : 0;
+
+  // Wall detection: level with suddenly larger quantity
+  const avgBidQty = top5Bids.reduce((s,b) => s+b[1], 0) / top5Bids.length;
+  const avgAskQty = top5Asks.reduce((s,a) => s+a[1], 0) / top5Asks.length;
+  const maxBidWall = top5Bids.reduce((max,b) => b[1] > max[1] ? b : max, [0,0]);
+  const maxAskWall = top5Asks.reduce((max,a) => a[1] > max[1] ? a : max, [0,0]);
+
+  // Total buy/sell pressure (top 25 levels)
+  const totalBidVol = bids.reduce((s,b) => s + b[1]*b[0], 0);
+  const totalAskVol = asks.reduce((s,a) => s + a[1]*a[0], 0);
+  const buyRatio = (totalBidVol + totalAskVol) > 0 ? totalBidVol / (totalBidVol + totalAskVol) : 0.5;
+
+  // Compare with previous snapshot
+  let changes = [];
+  if (previous && previous._ts) {
+    const prevBuyRatio = previous._ratio || 0.5;
+    const prevMaxBid = previous._maxBid || 0;
+    const prevMaxAsk = previous._maxAsk || 0;
+
+    if (buyRatio > prevBuyRatio + 0.05) changes.push('🟢 买盘力量增强');
+    else if (buyRatio < prevBuyRatio - 0.05) changes.push('🔴 卖盘力量增强');
+
+    if (maxBidWall[1] > prevMaxBid * 1.5) changes.push('🟢 买单墙加厚');
+    if (maxAskWall[1] > prevMaxAsk * 1.5) changes.push('🔴 卖单墙加厚');
+  }
+
+  // Save for next comparison
+  saveDepth({ _ratio: buyRatio, _maxBid: maxBidWall[1], _maxAsk: maxAskWall[1] });
+
+  // Activity assessment
+  let activity;
+  if (changes.length > 0 && changes.some(c => c.includes('🟢'))) activity = '买盘增强 🟢';
+  else if (changes.length > 0 && changes.some(c => c.includes('🔴'))) activity = '卖盘增强 🔴';
+  else if (buyRatio > 0.55) activity = '买盘略强';
+  else if (buyRatio < 0.45) activity = '卖盘略强';
+  else activity = '买卖均衡';
+
+  return {
+    status: 'ok',
+    activity,
+    spread_pct: +spread.toFixed(4),
+    bestBid: bestBid[0], bestBidQty: bestBid[1],
+    bestAsk: bestAsk[0], bestAskQty: bestAsk[1],
+    buyRatio: +(buyRatio * 100).toFixed(1),
+    maxBidWall: { price: maxBidWall[0], qty: maxBidWall[1] },
+    maxAskWall: { price: maxAskWall[0], qty: maxAskWall[1] },
+    topBids: top5Bids,
+    topAsks: top5Asks,
+    changes,
+    depthImbalance: buyRatio > 0.55 ? 'buy' : buyRatio < 0.45 ? 'sell' : 'neutral',
+  };
 }
 
 // ── Analysis engine ─────────────────────────────────────
@@ -283,6 +370,43 @@ function render(p, c, a, liveTime) {
       </div>
     </div>
 
+    ${w.depth && w.depth.status === 'ok' ? `
+    <div class="card">
+      <div class="card-title">📊 盘口深度 <span style="font-size:11px;color:#888;">(Binance DOGE/USDT)</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="font-size:18px;font-weight:800;color:#fff;">${w.depth.activity}</div>
+        <div style="font-size:11px;color:#888;">买卖比 ${w.depth.buyRatio}% | 价差 ${w.depth.spread_pct}%</div>
+      </div>
+      <div class="grid">
+        <div class="metric"><div class="label">💰 买一价</div><div class="value" style="color:#4caf50;">$${w.depth.bestBid?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">买一量(DOGE)</div><div class="value">${w.depth.bestBidQty?.toLocaleString()||'-'}</div></div>
+        <div class="metric"><div class="label">💰 卖一价</div><div class="value" style="color:#f44336;">$${w.depth.bestAsk?.toFixed(5)||'-'}</div></div>
+        <div class="metric"><div class="label">卖一量(DOGE)</div><div class="value">${w.depth.bestAskQty?.toLocaleString()||'-'}</div></div>
+      </div>
+      <div style="margin:8px 0;padding:8px;background:rgba(76,175,80,0.06);border-radius:8px;font-size:11px;color:#aaa;">
+        🟢 买单墙：${w.depth.maxBidWall?.qty?.toLocaleString()} DOGE @ $${w.depth.maxBidWall?.price?.toFixed(5) || '-'}
+      </div>
+      <div style="margin:8px 0;padding:8px;background:rgba(244,67,54,0.06);border-radius:8px;font-size:11px;color:#aaa;">
+        🔴 卖单墙：${w.depth.maxAskWall?.qty?.toLocaleString()} DOGE @ $${w.depth.maxAskWall?.price?.toFixed(5) || '-'}
+      </div>
+      ${w.depth.changes && w.depth.changes.length > 0 ? `
+      <div style="margin-top:8px;padding:8px 10px;background:rgba(66,133,244,0.08);border-radius:8px;font-size:12px;color:#90caf9;line-height:1.6;">
+        ${w.depth.changes.map(c => c).join('<br>')}
+      </div>
+      ` : ''}
+      <div style="margin-top:6px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.03);text-align:center;font-size:11px;color:#666;">
+        每30秒采样对比 | 墙加厚50%以上触发提醒
+      </div>
+    </div>
+    ` : `
+    <div class="card">
+      <div class="card-title">📊 盘口深度 <span style="font-size:11px;color:#888;">(Binance DOGE/USDT)</span></div>
+      <div style="text-align:center;padding:20px;color:#888;font-size:13px;">
+        ${w.depth && w.depth.status === 'no_data' ? 'Binance API 暂不可用（国内需VPN）' : '加载中...'}
+      </div>
+    </div>
+    `}
+
     <div class="card">
       <div class="card-title">🧠 阶段判断</div>
       <div class="phase-box"><div class="phase-text">${a.phase}</div></div>
@@ -369,14 +493,16 @@ async function main() {
   let c = cache ? cache.c : null;
 
   try {
-    const [cg, bc] = await Promise.all([
+    const [cg, bc, depth] = await Promise.all([
       fetchWithTimeout(CG_URL, 10000),
-      fetchWithTimeout(BC_URL, 8000).catch(() => null)
+      fetchWithTimeout(BC_URL, 8000).catch(() => null),
+      fetchDepth()
     ]);
 
     p = parseCG(cg);
     c = parseBC(bc);
     saveCache(p, c);
+    const d = analyzeDepth(depth, loadLastDepth());
 
   } catch(e) {
     // If we have cache, just show it — silently fail
@@ -393,8 +519,9 @@ async function main() {
   }
 
   // 3. Render fresh data
-  const a = analyze(p, c, cache);
-  render(p, c, a, now);
+    const a = analyze(p, c, cache);
+    a.whale.depth = d;
+    render(p, c, a, now);
 }
 
 main();
