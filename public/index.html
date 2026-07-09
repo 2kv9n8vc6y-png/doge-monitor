@@ -471,6 +471,25 @@ function render(p, c, a, liveTime, depthState) {
 
 // ── Parse CoinGecko response ────────────────────────────
 function parseCG(cg) {
+  // Fallback format (GitHub backup JSON): { price: { price_usd: ... } }
+  if (cg.price && cg.price.price_usd !== undefined) {
+    const fb = cg.price;
+    return {
+      price_usd: fb.price_usd,
+      change_24h_pct: fb.change_24h_pct,
+      change_7d_pct: fb.change_7d_pct,
+      change_30d_pct: fb.change_30d_pct,
+      market_cap_usd: fb.market_cap_usd,
+      volume_24h_usd: fb.volume_24h_usd,
+      market_cap_rank: fb.market_cap_rank,
+      ath_usd: fb.ath_usd,
+      atl_usd: fb.atl_usd,
+      high_24h_usd: fb.high_24h_usd,
+      low_24h_usd: fb.low_24h_usd,
+      circulating_supply: fb.circulating_supply,
+    };
+  }
+  // CoinGecko live format
   const m = cg.market_data || {};
   return {
     price_usd: m.current_price?.usd,
