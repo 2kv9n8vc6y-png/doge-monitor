@@ -7,7 +7,8 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;height:100vh}
-#app{display:grid;grid-template-columns:280px 1fr 320px;grid-template-rows:60px 1fr 200px;height:100vh;gap:4px;padding:4px}
+#app{display:grid;grid-template-columns:280px 1fr 320px;grid-template-rows:60px 1fr 200px;height:100vh;gap:4px;padding:4px;overflow:hidden}
+#app>*{min-height:0;overflow:hidden}
 
 /* Price strip */
 #priceBar{grid-column:1/-1;background:#111;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:2px solid #222}
