@@ -141,7 +141,7 @@ const MAX_LOG = 200;
 
 let bestBid = 0, bestAsk = 0, lastPrice = 0;
 let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
-let vwapCumPV = 0, vwapCumVol = 0, vwapPrice = 0;
+let vwapPrice = 0; // 24h VWAP from Binance ticker
 let bigTradesList = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
 let depthBids = [], depthAsks = [];
 let alerts = [], logLines = [];
@@ -204,16 +204,7 @@ function handleTrade(t) {
   const isBuy = !t.m; // m=false means buyer is the aggressor (market buy)
 
   lastPrice = price;
-
-  // VWAP accumulation
-  vwapCumPV += price * qty;
-  vwapCumVol += qty;
-  vwapPrice = vwapCumVol > 0 ? vwapCumPV / vwapCumVol : 0;
-  const vwapDiff = vwapPrice > 0 ? ((price - vwapPrice) / vwapPrice * 100) : 0;
-
-  $('price').innerHTML = '$' + price.toFixed(5) +
-    ' <span style="font-size:12px;color:' + (vwapDiff >= 0 ? '#4caf50' : '#f44336') + '">vs VWAP ' + (vwapDiff >= 0 ? '+' : '') + vwapDiff.toFixed(3) + '%</span>';
-  $('vwapVal').textContent = '$' + vwapPrice.toFixed(5);
+  updateVWAPDisplay(price);
 
   const pct = ((price - (curKline.open || price)) / (curKline.open || price) * 100).toFixed(2);
   const chgEl = $('change');
@@ -405,6 +396,22 @@ function addAlert(cls, text) {
   alertsEl.innerHTML = html;
 }
 
+function updateVWAPDisplay(price) {
+  var diff = vwapPrice > 0 ? ((price - vwapPrice) / vwapPrice * 100) : 0;
+  $('price').innerHTML = '$' + price.toFixed(5) +
+    ' <span style="font-size:12px;color:' + (diff >= 0 ? '#4caf50' : '#f44336') + '">vs 24hVWAP ' + (diff >= 0 ? '+' : '') + diff.toFixed(3) + '%</span>';
+}
+
+async function fetchVWAP() {
+  try {
+    var r = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=DOGEUSDT');
+    var data = await r.json();
+    vwapPrice = parseFloat(data.weightedAvgPrice) || 0;
+    $('vwapVal').textContent = '$' + vwapPrice.toFixed(5);
+    if (lastPrice > 0) updateVWAPDisplay(lastPrice);
+  } catch(e) {}
+}
+
 function log(msg) {
   const now = new Date().toLocaleTimeString('zh-CN');
   logLines.unshift('[' + now + '] ' + msg);
@@ -415,7 +422,9 @@ function log(msg) {
 // ── Start ─────────────────────────────────────────────
 connectWS();
 fetchChainData();
+fetchVWAP();
 setInterval(fetchChainData, 60000);
+setInterval(fetchVWAP, 30000);
 
 // Wakeup detection: fetch missed big trades when laptop wakes from sleep
 </script>
