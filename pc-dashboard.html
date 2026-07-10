@@ -141,9 +141,26 @@ const MAX_LOG = 200;
 
 let bestBid = 0, bestAsk = 0, lastPrice = 0;
 let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
-let vwapPrice = 0; // 24h VWAP from Binance ticker
+let deltaDay = new Date().toISOString().slice(0,10);
+let vwapPrice = 0;
 let bigTradesList = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
 let depthBids = [], depthAsks = [];
+
+(function initDelta() {
+  var saved = localStorage.getItem('doge_delta');
+  if (saved) {
+    var d = JSON.parse(saved);
+    if (d.day === deltaDay) {
+      totalBuyVol = d.buy || 0;
+      totalSellVol = d.sell || 0;
+      bigTrades = d.big || 0;
+    }
+  }
+})();
+
+function saveDelta() {
+  try { localStorage.setItem('doge_delta', JSON.stringify({ day: deltaDay, buy: totalBuyVol, sell: totalSellVol, big: bigTrades })); } catch(e) {}
+}
 let alerts = [], logLines = [];
 let wsConnected = false;
 
@@ -212,7 +229,12 @@ function handleTrade(t) {
   chgEl.style.background = pct >= 0 ? '#1b5e20' : '#b71c1c';
   chgEl.style.color = pct >= 0 ? '#4caf50' : '#f44336';
 
-  // Delta tracking
+  // Delta tracking — cross-day reset at 00:00 UTC
+  var today = new Date().toISOString().slice(0,10);
+  if (today !== deltaDay) {
+    totalBuyVol = 0; totalSellVol = 0; bigTrades = 0;
+    deltaDay = today;
+  }
   if (isBuy) totalBuyVol += qty;
   else totalSellVol += qty;
 
@@ -224,6 +246,7 @@ function handleTrade(t) {
   const isBig = value >= BIG_TRADE_THRESH;
   if (isBig) {
     bigTrades++;
+    saveDelta();
     const dir = isBuy ? '🟢 吃单' : '🔴 砸盘';
     const detail = dir + ' ' + qty.toLocaleString() + ' DOGE ($' + (value/1000).toFixed(0) + 'K) @ $' + price.toFixed(5);
     addAlert(isBuy ? 'bigBuy' : 'bigSell', detail + ' | ' + time);
@@ -244,6 +267,7 @@ function handleTrade(t) {
   $('totalSell').textContent = (totalSellVol/1e6).toFixed(2) + 'M';
   $('netDelta').textContent = (netDelta/1e6).toFixed(2) + 'M DOGE';
   $('bigTradeCount').textContent = bigTrades;
+  saveDelta();
 
   // Add to trade flow
   const cls = isBig ? (isBuy ? 'bigBuy' : 'bigSell') : (isBuy ? 'buy' : 'sell');
