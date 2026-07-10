@@ -126,6 +126,10 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
       <div class="chain-row"><span>最大转账24h</span><span class="val" id="bcLargest">---</span></div>
       <div class="chain-row"><span>巨鲸评分</span><span class="val" id="whaleScore" style="font-size:14px;">---</span></div>
     </div>
+    <div id="volProfile" style="background:#111;padding:10px;max-height:220px;overflow-y:auto;">
+      <h3 style="color:#f5a623;font-size:13px;margin-bottom:6px;">📊 成交分布 <span style="font-size:10px;color:#888;">(今日累计)</span></h3>
+      <div id="vpContent" style="font-size:10px;font-family:monospace;color:#888;text-align:center;padding:10px;">等待数据...</div>
+    </div>
     <div id="alerts"><h3>🔔 异动提醒</h3><div style="font-size:11px;color:#666;padding:20px;text-align:center;">等待交易数据...</div></div>
   </div>
 
@@ -145,6 +149,8 @@ let deltaDay = new Date().toISOString().slice(0,10);
 let vwapPrice = 0;
 let bigTradesList = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
 let depthBids = [], depthAsks = [];
+let volumeProfile = {};
+let vpResetDay = new Date().toISOString().slice(0,10);
 
 (function initDelta() {
   var saved = localStorage.getItem('doge_delta');
@@ -222,6 +228,11 @@ function handleTrade(t) {
 
   lastPrice = price;
   updateVWAPDisplay(price);
+
+  // Volume profile — daily reset, 0.0001 price buckets
+  var vpToday = new Date().toISOString().slice(0,10);
+  if (vpToday !== vpResetDay) { volumeProfile = {}; vpResetDay = vpToday; }
+  volumeProfile[price.toFixed(4)] = (volumeProfile[price.toFixed(4)] || 0) + qty;
 
   const pct = ((price - (curKline.open || price)) / (curKline.open || price) * 100).toFixed(2);
   const chgEl = $('change');
@@ -436,6 +447,37 @@ async function fetchVWAP() {
   } catch(e) {}
 }
 
+function renderVolumeProfile() {
+  var entries = [];
+  for (var price in volumeProfile) {
+    if (volumeProfile[price] > 0) entries.push({ price: parseFloat(price), qty: volumeProfile[price] });
+  }
+  if (entries.length === 0) { $('vpContent').innerHTML = '<div style="padding:10px;text-align:center;color:#666;">等待数据...</div>'; return; }
+  entries.sort(function(a,b) { return b.price - a.price; });
+  var maxQty = entries.reduce(function(m, e) { return Math.max(m, e.qty); }, 0);
+  var poc = entries.reduce(function(best, e) { return e.qty > best.qty ? e : best; }, entries[0]);
+  var curPrice = lastPrice || poc.price;
+
+  var html = '<div style="font-size:10px;color:#888;margin-bottom:4px;">POC: <span style="color:#f5a623;font-weight:700;">$' + poc.price.toFixed(4) + '</span> (' + (poc.qty/1e6).toFixed(2) + 'M DOGE)</div>';
+  var shown = 0;
+  for (var i = 0; i < entries.length && shown < 30; i++) {
+    var e = entries[i];
+    if (e.qty / maxQty < 0.02 && shown > 10) continue; // skip tiny bars after showing enough
+    shown++;
+    var barPct = maxQty > 0 ? (e.qty / maxQty * 100) : 0;
+    var isPoc = e.price === poc.price;
+    var isCurPrice = Math.abs(e.price - curPrice) < 0.0001;
+    html += '<div style="display:flex;align-items:center;gap:6px;padding:1px 0;">' +
+      '<span style="width:60px;text-align:right;color:' + (isCurPrice ? '#f5a623' : isPoc ? '#fff' : '#888') + ';font-weight:' + (isCurPrice ? '700' : '400') + '">$' + e.price.toFixed(4) + '</span>' +
+      '<div style="flex:1;height:12px;background:#222;border-radius:2px;overflow:hidden;">' +
+        '<div style="width:' + barPct + '%;height:100%;background:' + (isPoc ? '#f5a623' : isCurPrice ? '#4caf50' : '#4285f4') + ';opacity:' + (0.3 + barPct/100*0.7) + ';border-radius:2px;"></div>' +
+      '</div>' +
+      '<span style="width:80px;color:#aaa;font-size:10px;">' + (e.qty/1e6).toFixed(2) + 'M</span>' +
+    '</div>';
+  }
+  $('vpContent').innerHTML = html;
+}
+
 function log(msg) {
   const now = new Date().toLocaleTimeString('zh-CN');
   logLines.unshift('[' + now + '] ' + msg);
@@ -449,6 +491,7 @@ fetchChainData();
 fetchVWAP();
 setInterval(fetchChainData, 60000);
 setInterval(fetchVWAP, 30000);
+setInterval(renderVolumeProfile, 3000);
 
 // Wakeup detection: fetch missed big trades when laptop wakes from sleep
 </script>
