@@ -223,7 +223,8 @@ function handleTrade(t) {
   const price = parseFloat(t.p);
   const qty = parseFloat(t.q);
   const value = price * qty;
-  const time = new Date(t.T).toLocaleTimeString('zh-CN');
+  const d = new Date(t.T);
+  const time = (d.getMonth()+1) + '/' + d.getDate() + ' ' + d.toLocaleTimeString('zh-CN', {hour12: false});
   const isBuy = !t.m; // m=false means buyer is the aggressor (market buy)
 
   lastPrice = price;
@@ -419,7 +420,8 @@ async function fetchChainData() {
 
 // ── Helpers ───────────────────────────────────────────
 function addAlert(cls, text) {
-  const now = new Date().toLocaleTimeString('zh-CN');
+  const ad = new Date();
+  const now = (ad.getMonth()+1) + '/' + ad.getDate() + ' ' + ad.toLocaleTimeString('zh-CN', {hour12: false});
   alerts.unshift({ cls, text, time: now });
   if (alerts.length > MAX_ALERTS) alerts.pop();
 
