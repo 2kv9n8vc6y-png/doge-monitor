@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>DOGE 实时交易看板 (PC Pro)</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -148,6 +151,13 @@ let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
 let deltaDay = new Date().toISOString().slice(0,10);
 let vwapPrice = 0;
 let bigTradesList = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
+// Fix old entries that don't have month/day in time field
+bigTradesList = bigTradesList.map(function(t) {
+  if (t.time && t.time.indexOf('/') === -1) {
+    t.time = '7/13+ ' + t.time; // approximate date for legacy entries
+  }
+  return t;
+});
 let depthBids = [], depthAsks = [];
 let volumeProfile = {};
 let vpResetDay = new Date().toISOString().slice(0,10);
