@@ -104,13 +104,13 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
     <div id="tradeFlow"><h3>📈 实时成交流 (aggTrade)</h3><div id="trades"></div></div>
     <div id="bigTradeBar" style="background:#111;padding:6px 12px;font-size:11px;color:#aaa;flex-shrink:0;border-top:1px solid #222;min-height:28px;">💣 大单记录：暂无</div>
     <div id="deltaBar">
-      <h3>⚡ 成交量Delta (累计)</h3>
+      <h3>⚡ 主动成交 Delta (UTC日内)</h3>
       <div id="deltaMeter"><div id="deltaFill" style="width:50%"></div></div>
       <div id="deltaStats">
         <span>总买: <b id="totalBuy">0</b> DOGE</span>
         <span>总卖: <b id="totalSell">0</b> DOGE</span>
         <span>净Delta: <b id="netDelta">0</b></span>
-        <span>大单: <b id="bigTradeCount">0</b></span>
+        <span>实时大单: <b id="bigTradeCount">0</b></span>
       </div>
     </div>
   </div>
@@ -127,10 +127,10 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
       <div class="chain-row"><span>持币地址</span><span class="val" id="bcHodl">---</span></div>
       <div class="chain-row"><span>Mempool</span><span class="val" id="bcMemp">---</span></div>
       <div class="chain-row"><span>最大转账24h</span><span class="val" id="bcLargest">---</span></div>
-      <div class="chain-row"><span>巨鲸评分</span><span class="val" id="whaleScore" style="font-size:14px;">---</span></div>
+      <div class="chain-row"><span>链上活动参考</span><span class="val" id="whaleScore" style="font-size:12px;">---</span></div>
     </div>
     <div id="volProfile" style="background:#111;padding:10px;max-height:220px;overflow-y:auto;">
-      <h3 style="color:#f5a623;font-size:13px;margin-bottom:6px;">📊 成交分布 <span style="font-size:10px;color:#888;">(今日累计)</span></h3>
+      <h3 style="color:#f5a623;font-size:13px;margin-bottom:6px;">📊 成交分布 <span style="font-size:10px;color:#888;">(UTC日内·5m近似)</span></h3>
       <div id="vpContent" style="font-size:10px;font-family:monospace;color:#888;text-align:center;padding:10px;">等待数据...</div>
     </div>
     <div id="alerts"><h3>🔔 异动提醒</h3><div style="font-size:11px;color:#666;padding:20px;text-align:center;">等待交易数据...</div></div>
@@ -150,32 +150,95 @@ let bestBid = 0, bestAsk = 0, lastPrice = 0;
 let totalBuyVol = 0, totalSellVol = 0, bigTrades = 0;
 let deltaDay = new Date().toISOString().slice(0,10);
 let vwapPrice = 0;
-let bigTradesList = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
-// Fix old entries that don't have month/day in time field
+let bigTradesList = [];
+try {
+  const storedBigTrades = JSON.parse(localStorage.getItem('doge_big_trades') || '[]');
+  bigTradesList = Array.isArray(storedBigTrades) ? storedBigTrades.slice(0, 6) : [];
+} catch (e) {
+  localStorage.removeItem('doge_big_trades');
+}
+// Legacy entries did not contain a reliable date.
 bigTradesList = bigTradesList.map(function(t) {
   if (t.time && t.time.indexOf('/') === -1) {
-    t.time = '7/13+ ' + t.time; // approximate date for legacy entries
+    t.time = '日期未知 ' + t.time;
   }
   return t;
 });
 let depthBids = [], depthAsks = [];
 let volumeProfile = {};
 let vpResetDay = new Date().toISOString().slice(0,10);
+let historyDay = '';
 
 (function initDelta() {
   var saved = localStorage.getItem('doge_delta');
   if (saved) {
-    var d = JSON.parse(saved);
-    if (d.day === deltaDay) {
-      totalBuyVol = d.buy || 0;
-      totalSellVol = d.sell || 0;
-      bigTrades = d.big || 0;
-    }
+    try {
+      var d = JSON.parse(saved);
+      if (d.day === deltaDay) {
+        totalBuyVol = d.buy || 0;
+        totalSellVol = d.sell || 0;
+        bigTrades = 0; // count only trades observed in the current live session
+      }
+    } catch (e) { localStorage.removeItem('doge_delta'); }
   }
 })();
 
 function saveDelta() {
-  try { localStorage.setItem('doge_delta', JSON.stringify({ day: deltaDay, buy: totalBuyVol, sell: totalSellVol, big: bigTrades })); } catch(e) {}
+  try { localStorage.setItem('doge_delta', JSON.stringify({ day: deltaDay, buy: totalBuyVol, sell: totalSellVol })); } catch(e) {}
+}
+
+function fetchJsonWithTimeout(url, timeoutMs) {
+  return Promise.race([
+    fetch(url, { cache: 'no-store' }).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }),
+    new Promise(function(_, reject) {
+      setTimeout(function() { reject(new Error('请求超时')); }, timeoutMs);
+    })
+  ]);
+}
+
+async function bootstrapUtcSession() {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const url = 'https://api.binance.com/api/v3/klines?symbol=DOGEUSDT&interval=5m&startTime=' + start.getTime() + '&limit=1000';
+  const candles = await fetchJsonWithTimeout(url, 12000);
+  deltaDay = new Date().toISOString().slice(0,10);
+  vpResetDay = deltaDay;
+  historyDay = deltaDay;
+  bigTrades = 0;
+  totalBuyVol = 0;
+  totalSellVol = 0;
+  volumeProfile = {};
+  candles.forEach(function(k) {
+    const total = Number(k[5]) || 0;
+    const takerBuy = Number(k[9]) || 0;
+    totalBuyVol += takerBuy;
+    totalSellVol += Math.max(0, total - takerBuy);
+    const typical = (Number(k[2]) + Number(k[3]) + Number(k[4])) / 3;
+    if (typical > 0) {
+      const bucket = typical.toFixed(4);
+      volumeProfile[bucket] = (volumeProfile[bucket] || 0) + total;
+    }
+  });
+  updateDeltaDisplay();
+  saveDelta();
+  renderVolumeProfile();
+  log('UTC日内历史已补齐：' + candles.length + ' 根5分钟K线');
+}
+
+function updateDeltaDisplay() {
+  const netDelta = totalBuyVol - totalSellVol;
+  const totalVol = totalBuyVol + totalSellVol;
+  const deltaPct = totalVol > 0 ? netDelta / totalVol * 100 : 0;
+  const fillEl = $('deltaFill');
+  fillEl.style.width = Math.max(0, Math.min(100, 50 + deltaPct / 2)) + '%';
+  fillEl.className = netDelta >= 0 ? '' : 'sell';
+  $('totalBuy').textContent = (totalBuyVol/1e6).toFixed(2) + 'M';
+  $('totalSell').textContent = (totalSellVol/1e6).toFixed(2) + 'M';
+  $('netDelta').textContent = (netDelta/1e6).toFixed(2) + 'M DOGE';
+  $('bigTradeCount').textContent = bigTrades;
 }
 let alerts = [], logLines = [];
 let wsConnected = false;
@@ -192,7 +255,9 @@ if (bigTradesList.length > 0) {
   }, 500);
 }
 
-let prevDepthBidWall = 0, prevDepthAskWall = 0;
+let prevBidLevels = new Map(), prevAskLevels = new Map();
+let lastWallCheck = 0;
+let wallAlertCooldown = new Map();
 let curKline = { open:0, high:0, low:0, volume:0 };
 
 // ── DOM refs ──────────────────────────────────────────
@@ -274,7 +339,6 @@ function handleTrade(t) {
     addAlert(isBuy ? 'bigBuy' : 'bigSell', detail + ' | ' + time);
     // Update big trade bar
     const bar = document.getElementById('bigTradeBar');
-    const existing = bigTradesList.length > 0 ? bigTradesList.map(function(t) { return t.detail + ' ' + t.time; }).join(' | ') : '';
     bigTradesList.unshift({ detail: detail, time: time });
     if (bigTradesList.length > 6) bigTradesList.pop();
     saveBigTrades();
@@ -282,13 +346,7 @@ function handleTrade(t) {
   }
 
   // Update delta meter
-  const fillEl = $('deltaFill');
-  fillEl.style.width = (50 + deltaPct * 2) + '%';
-  fillEl.className = netDelta >= 0 ? '' : 'sell';
-  $('totalBuy').textContent = (totalBuyVol/1e6).toFixed(2) + 'M';
-  $('totalSell').textContent = (totalSellVol/1e6).toFixed(2) + 'M';
-  $('netDelta').textContent = (netDelta/1e6).toFixed(2) + 'M DOGE';
-  $('bigTradeCount').textContent = bigTrades;
+  updateDeltaDisplay();
   saveDelta();
 
   // Add to trade flow
@@ -333,22 +391,18 @@ function handleDepth(d) {
   depthAsks.forEach(a => askTotal += a[1] * a[0]);
   const ratio = (bidTotal + askTotal) > 0 ? (bidTotal / (bidTotal + askTotal) * 100).toFixed(1) : '---';
 
-  // Wall change detection
-  if (prevDepthBidWall > 0 && maxBidQty > prevDepthBidWall * 1.5) {
-    addAlert('bigBuy', '🟢 买单墙加厚！' + maxBidQty.toLocaleString() + ' DOGE @ $' + maxBid[0].toFixed(5));
+  // Compare the same price level once per second. A reduction can be a fill,
+  // cancellation, or the level moving outside the top-20 book; do not overstate it.
+  const now = Date.now();
+  if (now - lastWallCheck >= 1000) {
+    const bidMap = new Map(depthBids.map(([p,q]) => [p.toFixed(5), q]));
+    const askMap = new Map(depthAsks.map(([p,q]) => [p.toFixed(5), q]));
+    trackWallChanges('bid', prevBidLevels, bidMap);
+    trackWallChanges('ask', prevAskLevels, askMap);
+    prevBidLevels = bidMap;
+    prevAskLevels = askMap;
+    lastWallCheck = now;
   }
-  if (prevDepthAskWall > 0 && maxAskQty > prevDepthAskWall * 1.5) {
-    addAlert('bigSell', '🔴 卖单墙加厚！' + maxAskQty.toLocaleString() + ' DOGE @ $' + maxAsk[0].toFixed(5));
-  }
-  // Wall disappearance (wall was thick, now shrunk to <30% of previous)
-  if (prevDepthBidWall > 500000 && maxBidQty < prevDepthBidWall * 0.3) {
-    addAlert('bigSell', '⚠️ 买单墙消失！从 ' + prevDepthBidWall.toLocaleString() + ' 缩到 ' + maxBidQty.toLocaleString() + ' DOGE，托底可能撤了');
-  }
-  if (prevDepthAskWall > 500000 && maxAskQty < prevDepthAskWall * 0.3) {
-    addAlert('bigBuy', '🚀 卖单墙消失！从 ' + prevDepthAskWall.toLocaleString() + ' 缩到 ' + maxAskQty.toLocaleString() + ' DOGE，压盘可能撤了，注意突破');
-  }
-  prevDepthBidWall = maxBidQty;
-  prevDepthAskWall = maxAskQty;
 
   // Render depth
   $('spread').textContent = spread + '%';
@@ -369,15 +423,42 @@ function handleDepth(d) {
   $('depthBids').innerHTML = bidHTML;
 }
 
+function trackWallChanges(side, previous, current) {
+  const isBid = side === 'bid';
+  current.forEach((qty, price) => {
+    const oldQty = previous.get(price) || 0;
+    if (oldQty >= 500000 && qty >= oldQty * 1.5 && qty - oldQty >= 300000) {
+      addWallAlert(side + ':grow:' + price, isBid ? 'bigBuy' : 'bigSell',
+        (isBid ? '🟢 买单墙加厚' : '🔴 卖单墙加厚') +
+        ' @ $' + price + '：' + oldQty.toLocaleString() + ' → ' + qty.toLocaleString() + ' DOGE');
+    }
+  });
+  previous.forEach((oldQty, price) => {
+    if (oldQty < 500000) return;
+    const qty = current.get(price) || 0;
+    if (qty < oldQty * 0.3 && oldQty - qty >= 300000) {
+      addWallAlert(side + ':shrink:' + price, isBid ? 'bigSell' : 'bigBuy',
+        (isBid ? '⚠️ 买单墙大幅减少' : '🚀 卖单墙大幅减少') +
+        ' @ $' + price + '：' + oldQty.toLocaleString() + ' → ' + qty.toLocaleString() +
+        ' DOGE（可能成交、撤单或移出前20档）');
+    }
+  });
+}
+
+function addWallAlert(key, cls, text) {
+  const now = Date.now();
+  const last = wallAlertCooldown.get(key) || 0;
+  if (now - last < 30000) return;
+  wallAlertCooldown.set(key, now);
+  addAlert(cls, text);
+}
+
 // ── Kline handler ─────────────────────────────────────
 function handleKline(k) {
   curKline.open = parseFloat(k.o);
   curKline.high = parseFloat(k.h);
   curKline.low = parseFloat(k.l);
   curKline.volume = parseFloat(k.v);
-  $('high').textContent = '$' + curKline.high.toFixed(5);
-  $('low').textContent = '$' + curKline.low.toFixed(5);
-  $('vol').textContent = (curKline.volume/1e6).toFixed(1) + 'M';
 }
 
 // ── Chain data poll ──────────────────────────────────
@@ -401,22 +482,13 @@ async function fetchChainData() {
     const lt = (d.largest_transaction_24h && d.largest_transaction_24h.value_usd) || 0;
     $('bcLargest').textContent = '$' + (lt/1e6).toFixed(1) + 'M';
 
-    // Whale score from chain data
+    // Chain activity reference only. Direction cannot be inferred without
+    // labelled exchange addresses and a historical baseline.
     const cdd = d.cdd_24h || 0;
     const tx24 = d.transactions_24h || 0;
-    const fee24 = d.fee_24h_usd || 0;
     const hodl = d.hodling_addresses || 0;
-    let score = 0;
     const cddPerTx = tx24 > 0 ? cdd / tx24 : 0;
-    if (cddPerTx < 50000) score += 25;
-    else if (cddPerTx < 200000) score += 15;
-    if (hodl > 9000000) score += 10;
-    if (fee24 > 20000) score += 10;
-    else if (fee24 > 5000) score += 5;
-    if (lt > 10000000) score += 15;
-    else if (lt > 1000000) score += 10;
-    let wlvl = score >= 50 ? '🔥🔥 高度活跃' : score >= 30 ? '🔥 温和' : score >= 15 ? '有动静' : '💤 低迷';
-    $('whaleScore').textContent = wlvl + ' (' + score + '/100)';
+    $('whaleScore').textContent = 'CDD/笔 ' + (cddPerTx/1e6).toFixed(1) + 'M币天 · 最大转账 $' + (lt/1e6).toFixed(1) + 'M';
     $('miniCdd').textContent = (cdd/1e9).toFixed(1) + 'B';
     $('miniHodl').textContent = (hodl/1e6).toFixed(1) + 'M';
     $('chainTx').textContent = tx24.toLocaleString();
@@ -455,6 +527,9 @@ async function fetchVWAP() {
     var data = await r.json();
     vwapPrice = parseFloat(data.weightedAvgPrice) || 0;
     $('vwapVal').textContent = '$' + vwapPrice.toFixed(5);
+    $('high').textContent = '$' + (parseFloat(data.highPrice) || 0).toFixed(5);
+    $('low').textContent = '$' + (parseFloat(data.lowPrice) || 0).toFixed(5);
+    $('vol').textContent = ((parseFloat(data.volume) || 0)/1e6).toFixed(1) + 'M';
     if (lastPrice > 0) updateVWAPDisplay(lastPrice);
   } catch(e) {}
 }
@@ -498,12 +573,25 @@ function log(msg) {
 }
 
 // ── Start ─────────────────────────────────────────────
-connectWS();
-fetchChainData();
-fetchVWAP();
+async function startDashboard() {
+  try { await bootstrapUtcSession(); }
+  catch (e) { log('日内历史补齐失败，将仅显示启动后的实时数据：' + e.message); }
+  connectWS();
+  fetchChainData();
+  fetchVWAP();
+}
+
+startDashboard();
 setInterval(fetchChainData, 60000);
 setInterval(fetchVWAP, 30000);
 setInterval(renderVolumeProfile, 3000);
+setInterval(function() {
+  const today = new Date().toISOString().slice(0,10);
+  if (historyDay && today !== historyDay) {
+    bigTrades = 0;
+    bootstrapUtcSession().catch(e => log('跨日历史补齐失败：' + e.message));
+  }
+}, 30000);
 
 // Wakeup detection: fetch missed big trades when laptop wakes from sleep
 </script>
