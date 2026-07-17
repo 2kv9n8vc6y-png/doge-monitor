@@ -95,7 +95,24 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 .future-item{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.04);padding:3px 0}
 .future-item .v{color:#eee;font-weight:600}
 #microFlow{margin-top:7px;padding:6px;background:#181818;border-radius:5px;font-size:10px;color:#888}
-#log{height:174px;overflow-y:auto;padding:4px;font-size:10px;font-family:monospace;color:#666}
+#signalPanel{border-top:2px solid #555;transition:border-color .2s,background .2s}
+#signalPanel.signal-enter{border-top-color:#4caf50;background:linear-gradient(180deg,rgba(76,175,80,.09),#111 42%)}
+#signalPanel.signal-exit{border-top-color:#f44336;background:linear-gradient(180deg,rgba(244,67,54,.09),#111 42%)}
+#signalPanel.signal-watch{border-top-color:#f5a623}
+#signalPanel.signal-hold{border-top-color:#4285f4}
+.signal-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#signalBadge{font-size:10px;padding:2px 7px;border-radius:10px;background:#252525;color:#aaa;white-space:nowrap}
+#signalHeadline{font-size:19px;font-weight:800;letter-spacing:.5px;margin:2px 0 3px;color:#ddd}
+#signalScore{font-size:10px;color:#aaa;margin-bottom:4px}
+#signalMetrics{font-size:9px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+#signalReasons{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:52px;overflow-y:auto;margin-bottom:5px}
+.signal-reason{font-size:9px;line-height:1.35;padding:4px 5px;border-radius:4px;background:#171717;color:#888}
+.signal-reason.good{border-left:2px solid #4caf50}.signal-reason.risk{border-left:2px solid #f44336}
+#positionRow{display:flex;align-items:center;gap:6px;font-size:9px;color:#777}
+#positionToggle{border:1px solid #444;background:#202020;color:#ddd;border-radius:4px;padding:3px 7px;font-size:9px;cursor:pointer}
+#positionToggle:hover{border-color:#f5a623}
+#signalDisclaimer{margin-left:auto;color:#555;white-space:nowrap}
+#log{height:21px;overflow:hidden;text-overflow:ellipsis;padding:3px 0 0;margin-top:4px;border-top:1px solid #1e1e1e;font-size:9px;font-family:monospace;color:#555;white-space:nowrap}
 .fresh{color:#4caf50}.stale{color:#f44336}.muted{color:#777}
 
 /* Connecting overlay */
@@ -192,7 +209,22 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
       </div>
       <div id="microFlow">近5秒现货主动流：等待成交...</div>
     </div>
-    <div class="bottom-panel"><h3>🧾 运行状态</h3><div id="log"></div></div>
+    <div class="bottom-panel" id="signalPanel">
+      <h3 class="signal-head"><span>🧭 交易决策助手</span><span id="signalBadge">等待数据</span></h3>
+      <div id="signalHeadline">正在建立判断基线</div>
+      <div id="signalScore">多头评分 -- ｜ 风险评分 --</div>
+      <div id="signalMetrics">等待现货、合约与 BTC 数据...</div>
+      <div id="signalReasons">
+        <div class="signal-reason good" id="signalGood">支持：等待数据</div>
+        <div class="signal-reason risk" id="signalRisk">反对：等待数据</div>
+      </div>
+      <div id="positionRow">
+        <button id="positionToggle" type="button">标记我已入场</button>
+        <span id="positionStatus">未标记持仓</span>
+        <span id="signalDisclaimer">规则辅助，不自动下单</span>
+      </div>
+      <div id="log"></div>
+    </div>
   </div>
 </div>
 
@@ -700,6 +732,12 @@ let lastFuturesMessageAt = 0;
 let futuresMinuteBuckets = new Map();
 let liquidationEvents = [];
 let futuresMarkPrice = 0;
+let futuresOiChange = null, futuresTakerRatio = null;
+let futuresFundingRate = null, futuresBasis = null;
+let futuresDataAt = 0, vwapDataAt = 0;
+let btc5mChange = null, btcContextAt = 0;
+let positionMarked = localStorage.getItem('doge_position_marked') === '1';
+let signalCandidate = null, signalCandidateSince = 0;
 
 function utcDay(ts) {
   return new Date(ts).toISOString().slice(0, 10);
@@ -735,6 +773,10 @@ function formatDelta(value) {
   if (abs >= 1e6) return sign + (value / 1e6).toFixed(2) + 'M';
   if (abs >= 1e3) return sign + (value / 1e3).toFixed(1) + 'K';
   return sign + value.toFixed(0);
+}
+
+function signedPercent(value) {
+  return Number.isFinite(value) ? (value > 0 ? '+' : '') + value.toFixed(2) + '%' : '--';
 }
 
 function setSignedValue(el, value, suffix) {
@@ -1104,6 +1146,123 @@ function windowStats(minutes) {
   return { buy, sell, net: buy - sell, ratio: total > 0 ? (buy - sell) / total * 100 : 0 };
 }
 
+function buildTradingSignal() {
+  const now = Date.now();
+  const d1 = windowStats(1);
+  const d5 = windowStats(5);
+  const d15 = windowStats(15);
+  const d60 = windowStats(60);
+  const doge5mChange = curKline.open > 0 && lastPrice > 0 ? (lastPrice - curKline.open) / curKline.open * 100 : null;
+  const good = [], risk = [], missing = [];
+  let longScore = 0, riskScore = 0;
+  const addGood = (points, text) => { longScore += points; good.push(text); };
+  const addRisk = (points, text) => { riskScore += points; risk.push(text); };
+
+  if (!metricsReady) missing.push('Delta历史');
+  if (!(lastPrice > 0) || now - lastTradeMessageAt > 20000) missing.push('现货实时流');
+  if (!(vwapPrice > 0) || now - vwapDataAt > 90000) missing.push('24h VWAP');
+  if (!Number.isFinite(futuresTakerRatio) || now - futuresDataAt > 90000) missing.push('合约数据');
+  if (!Number.isFinite(btc5mChange) || now - btcContextAt > 90000) missing.push('BTC 5m');
+
+  if (lastPrice > vwapPrice) addGood(1, '价格位于24h VWAP上方');
+  else if (lastPrice > 0 && vwapPrice > 0) addRisk(1, '价格位于24h VWAP下方');
+
+  if (d5.ratio >= 5) addGood(2, '5m主动买入占优 ' + signedPercent(d5.ratio));
+  else if (d5.ratio <= -5) addRisk(2, '5m主动卖出占优 ' + signedPercent(d5.ratio));
+  if (d15.ratio >= 3) addGood(2, '15m主动买入延续 ' + signedPercent(d15.ratio));
+  else if (d15.ratio <= -3) addRisk(2, '15m主动卖出延续 ' + signedPercent(d15.ratio));
+  if (d60.net > 0) addGood(1, '60m Delta为正');
+  else if (d60.net < 0) addRisk(1, '60m Delta为负');
+
+  if (Number.isFinite(futuresTakerRatio)) {
+    if (futuresTakerRatio >= 1.05) addGood(1, '合约主动买卖比 ' + futuresTakerRatio.toFixed(3));
+    else if (futuresTakerRatio <= 0.95) addRisk(1, '合约主动买卖比 ' + futuresTakerRatio.toFixed(3));
+  }
+  if (Number.isFinite(btc5mChange)) {
+    if (btc5mChange >= 0) addGood(0.5, 'BTC 5m未拖累');
+    else if (btc5mChange <= -0.10) addRisk(1, 'BTC 5m走弱 ' + signedPercent(btc5mChange));
+  }
+  if (Number.isFinite(futuresOiChange) && Number.isFinite(doge5mChange) && futuresOiChange > 0.05) {
+    if (doge5mChange > 0) addGood(0.5, 'OI与价格同步上升');
+    else if (doge5mChange < 0) addRisk(0.5, 'OI增加但价格下跌');
+  }
+
+  const activeWalls = [...wallStates.values()].filter(w => w.alerted && now - w.lastSeen < 1500);
+  const bidWallValue = activeWalls.filter(w => w.side === 'bid').reduce((sum, w) => sum + w.price * w.lastQty, 0);
+  const askWallValue = activeWalls.filter(w => w.side === 'ask').reduce((sum, w) => sum + w.price * w.lastQty, 0);
+  if (bidWallValue > 0 && bidWallValue >= askWallValue * 1.25) addGood(0.5, '持续买墙占优');
+  else if (askWallValue > 0 && askWallValue >= bidWallValue * 1.25) addRisk(0.5, '持续卖墙占优');
+
+  const recentBigTrades = bigTradesList.filter(event => event && event.version === 2 && now - event.ts <= 5 * 60000);
+  if (recentBigTrades.some(event => event.side === 'buy' && event.classification === '同向延续')) addGood(1, '近期大买单得到价格确认');
+  if (recentBigTrades.some(event => event.side === 'sell' && event.classification === '反向吸收候选')) addGood(1, '近期大卖单疑似被吸收');
+  if (recentBigTrades.some(event => event.side === 'sell' && event.classification === '同向延续')) addRisk(1, '近期大卖单后价格延续下行');
+  if (recentBigTrades.some(event => event.side === 'buy' && event.classification === '反向吸收候选')) addRisk(1, '近期大买单未推动价格');
+
+  const coreLong = lastPrice > vwapPrice && d5.ratio >= 5 && d15.ratio >= 3 && d60.net > 0 &&
+    Number.isFinite(futuresTakerRatio) && futuresTakerRatio >= 0.95 && Number.isFinite(btc5mChange) && btc5mChange > -0.15;
+  const coreExit = (d5.ratio <= -5 && d15.ratio <= -3) || (lastPrice < vwapPrice && d5.ratio <= -8);
+  let raw = 'WAIT';
+  if (missing.length) raw = 'DATA';
+  else if (positionMarked && coreExit && riskScore >= 5) raw = 'EXIT';
+  else if (positionMarked && riskScore >= 3) raw = 'RISK';
+  else if (positionMarked) raw = 'HOLD';
+  else if (coreLong && longScore >= 6 && riskScore <= 2) raw = 'ENTER';
+  else if (longScore >= 4 && riskScore < 4) raw = 'CANDIDATE';
+
+  return { raw, longScore, riskScore, good, risk, missing, d1, d5, d15, d60, doge5mChange };
+}
+
+function updatePositionUi() {
+  $('positionToggle').textContent = positionMarked ? '清除持仓标记' : '标记我已入场';
+  $('positionStatus').textContent = positionMarked ? '已标记持仓，离场规则已启用' : '未标记持仓';
+  $('positionStatus').style.color = positionMarked ? '#4285f4' : '#777';
+}
+
+function updateTradingSignal() {
+  const data = buildTradingSignal();
+  let state = data.raw;
+  let confirmLeft = 0;
+  if (data.raw === 'ENTER' || data.raw === 'EXIT') {
+    if (signalCandidate !== data.raw) {
+      signalCandidate = data.raw;
+      signalCandidateSince = Date.now();
+    }
+    const elapsed = (Date.now() - signalCandidateSince) / 1000;
+    if (elapsed < 20) {
+      state = data.raw + '_FORMING';
+      confirmLeft = Math.ceil(20 - elapsed);
+    }
+  } else {
+    signalCandidate = null;
+    signalCandidateSince = 0;
+  }
+
+  const views = {
+    DATA: ['等待数据', '正在建立判断基线', 'signal-watch'],
+    WAIT: ['暂不入场', '等待更清晰的方向', 'signal-watch'],
+    CANDIDATE: ['等待确认', '入场条件正在改善', 'signal-watch'],
+    ENTER_FORMING: ['确认中', '入场条件形成中 · ' + confirmLeft + '秒', 'signal-watch'],
+    ENTER: ['入场信号', '建议入场', 'signal-enter'],
+    HOLD: ['持有观察', '趋势尚未破坏', 'signal-hold'],
+    RISK: ['趋势转弱', '谨慎持有 / 收紧风控', 'signal-watch'],
+    EXIT_FORMING: ['确认中', '离场条件形成中 · ' + confirmLeft + '秒', 'signal-watch'],
+    EXIT: ['离场信号', '建议离场', 'signal-exit']
+  };
+  const view = views[state] || views.WAIT;
+  $('signalBadge').textContent = view[0];
+  $('signalHeadline').textContent = view[1];
+  $('signalPanel').className = 'bottom-panel ' + view[2];
+  $('signalHeadline').style.color = state === 'ENTER' ? '#4caf50' : state === 'EXIT' ? '#f44336' : state === 'HOLD' ? '#4285f4' : '#ddd';
+  $('signalScore').textContent = '多头评分 ' + data.longScore.toFixed(1) + ' ｜ 风险评分 ' + data.riskScore.toFixed(1) +
+    (data.missing.length ? ' ｜ 缺少：' + data.missing.join('、') : '');
+  $('signalMetrics').textContent = '5m Δ ' + signedPercent(data.d5.ratio) + ' ｜ 15m Δ ' + signedPercent(data.d15.ratio) +
+    ' ｜ BTC 5m ' + (Number.isFinite(btc5mChange) ? signedPercent(btc5mChange) : '--') +
+    ' ｜ 合约比 ' + (Number.isFinite(futuresTakerRatio) ? futuresTakerRatio.toFixed(3) : '--');
+  $('signalGood').textContent = '支持：' + (data.good.length ? data.good.join('；') : '暂无强支撑');
+  $('signalRisk').textContent = '反对：' + (data.risk.length ? data.risk.join('；') : '暂无明显风险');
+}
+
 function updateWindowCard(valueId, ratioId, stats) {
   const valueEl = $(valueId);
   valueEl.textContent = formatDelta(stats.net);
@@ -1372,6 +1531,7 @@ async function fetchVWAP() {
   try {
     const data = await fetchJson('https://api.binance.com/api/v3/ticker/24hr?symbol=' + SYMBOL, 10000);
     vwapPrice = Number(data.weightedAvgPrice) || 0;
+    vwapDataAt = Date.now();
     $('vwapVal').textContent = vwapPrice > 0 ? '$' + vwapPrice.toFixed(5) : '不可用';
     $('high').textContent = Number(data.highPrice) > 0 ? '$' + Number(data.highPrice).toFixed(5) : '不可用';
     $('low').textContent = Number(data.lowPrice) > 0 ? '$' + Number(data.lowPrice).toFixed(5) : '不可用';
@@ -1380,6 +1540,20 @@ async function fetchVWAP() {
     if (lastPrice > 0) updateVWAPDisplay(lastPrice);
   } catch (error) {
     log('24h行情获取失败：' + error.message);
+  }
+}
+
+async function fetchBtcContext() {
+  try {
+    const data = await fetchJson('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=2', 10000);
+    const latest = Array.isArray(data) && data.length ? data[data.length - 1] : null;
+    const open = latest ? Number(latest[1]) : 0;
+    const close = latest ? Number(latest[4]) : 0;
+    if (!(open > 0) || !(close > 0)) throw new Error('BTC K线格式异常');
+    btc5mChange = (close - open) / open * 100;
+    btcContextAt = Date.now();
+  } catch (error) {
+    log('BTC 5分钟背景获取失败：' + error.message);
   }
 }
 
@@ -1525,11 +1699,13 @@ async function fetchFuturesData() {
     const data = premiumResult.value;
     futuresMarkPrice = Number(data.markPrice) || 0;
     const funding = Number(data.lastFundingRate);
+    futuresFundingRate = Number.isFinite(funding) ? funding : null;
     $('fMark').textContent = futuresMarkPrice > 0 ? '$' + futuresMarkPrice.toFixed(5) : '不可用';
     $('fFunding').textContent = Number.isFinite(funding) ? (funding * 100).toFixed(4) + '%' : '不可用';
     $('fFunding').style.color = funding > 0 ? '#f44336' : funding < 0 ? '#4caf50' : '#aaa';
     $('fFundingTime').textContent = Number(data.nextFundingTime) ? formatClock(Number(data.nextFundingTime)) : '不可用';
     const basis = lastPrice > 0 && futuresMarkPrice > 0 ? (futuresMarkPrice - lastPrice) / lastPrice * 100 : null;
+    futuresBasis = Number.isFinite(basis) ? basis : null;
     setSignedValue($('fBasis'), basis, '%');
   } else {
     log('合约标记价格/资金费率获取失败：' + premiumResult.reason.message);
@@ -1546,6 +1722,7 @@ async function fetchFuturesData() {
     const first = Number(oiHistResult.value[0].sumOpenInterestValue);
     const last = Number(oiHistResult.value[oiHistResult.value.length - 1].sumOpenInterestValue);
     const change = first > 0 ? (last - first) / first * 100 : null;
+    futuresOiChange = Number.isFinite(change) ? change : null;
     setSignedValue($('fOiChange'), change, '%');
   } else if (oiHistResult.status === 'rejected') {
     log('OI历史获取失败：' + oiHistResult.reason.message);
@@ -1554,6 +1731,8 @@ async function fetchFuturesData() {
   if (takerResult.status === 'fulfilled' && Array.isArray(takerResult.value) && takerResult.value.length) {
     const latest = takerResult.value[takerResult.value.length - 1];
     const ratio = Number(latest.buySellRatio);
+    futuresTakerRatio = Number.isFinite(ratio) ? ratio : null;
+    if (Number.isFinite(futuresTakerRatio)) futuresDataAt = Date.now();
     $('fTakerRatio').textContent = Number.isFinite(ratio) ? ratio.toFixed(3) : '不可用';
     $('fTakerRatio').style.color = ratio > 1 ? '#4caf50' : ratio < 1 ? '#f44336' : '#aaa';
   } else if (takerResult.status === 'rejected') {
@@ -1582,6 +1761,16 @@ async function startDashboardV2() {
   loadSavedDelta();
   renderBigTrades();
   updateAllMetrics();
+  updatePositionUi();
+  updateTradingSignal();
+  $('positionToggle').addEventListener('click', () => {
+    positionMarked = !positionMarked;
+    localStorage.setItem('doge_position_marked', positionMarked ? '1' : '0');
+    signalCandidate = null;
+    signalCandidateSince = 0;
+    updatePositionUi();
+    updateTradingSignal();
+  });
   connectSpotWS();
   connectFuturesWS();
 
@@ -1594,14 +1783,17 @@ async function startDashboardV2() {
     log('日内历史补齐失败，Delta暂用本地记录并继续实时累计：' + error.message);
   });
   fetchVWAP();
+  fetchBtcContext();
   fetchChainData();
   fetchFuturesData();
 
   setInterval(updateMicroFlow, 1000);
   setInterval(updateFuturesRealtimeMetrics, 1000);
+  setInterval(updateTradingSignal, 1000);
   setInterval(updateFreshness, 1000);
   setInterval(renderVolumeProfile, 3000);
   setInterval(fetchVWAP, 30000);
+  setInterval(fetchBtcContext, 30000);
   setInterval(fetchFuturesData, 30000);
   setInterval(fetchChainData, 60000);
   setInterval(() => saveDelta(true), 15000);
