@@ -14,36 +14,41 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 #app>*{min-height:0;overflow:hidden}
 
 /* Price strip */
-#priceBar{grid-column:1/-1;background:#111;display:flex;align-items:center;justify-content:space-between;padding:0 20px;border-bottom:2px solid #222}
+#priceBar{grid-column:1/-1;background:#111;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 20px;border-bottom:2px solid #222}
+#priceBar>div{min-width:0;white-space:nowrap}
+#priceBar>div:first-child,#priceBar>div:last-child{flex:0 0 auto}
+#priceBar>div.info{overflow:hidden;text-overflow:ellipsis}
+#priceBar>div:nth-child(2){flex:1 1 auto}
+#priceBar>div:nth-child(3){flex:0 1 auto;max-width:285px}
 #priceBar .ticker{font-size:28px;font-weight:800;color:#fff}
 #priceBar .change{font-size:16px;font-weight:700;padding:4px 12px;border-radius:12px}
-#priceBar .info{font-size:12px;color:#888}
-#priceBar .status{font-size:11px;padding:3px 8px;border-radius:8px}
+#priceBar .info{font-size:13px;color:#888}
+#priceBar .status{font-size:12px;padding:3px 8px;border-radius:8px}
 #priceBar .live{background:#1b5e20;color:#4caf50}
 #priceBar .dead{background:#b71c1c;color:#f44336}
 
 /* Left: Order Book */
 #depth{background:#111;overflow-y:auto;padding:8px}
 #depth h3{color:#f5a623;font-size:13px;margin-bottom:8px;text-align:center}
-.depth-row{display:flex;justify-content:space-between;padding:2px 6px;font-size:11px;font-family:monospace;position:relative}
+.depth-row{display:flex;justify-content:space-between;padding:2px 6px;font-size:12px;font-family:monospace;position:relative}
 .depth-row.ask{color:#ff6b6b}
 .depth-row.bid{color:#4caf50}
 .depth-row .bar{position:absolute;right:0;top:0;height:100%;opacity:0.15}
 .depth-row.ask .bar{background:#ff6b6b}
 .depth-row.bid .bar{background:#4caf50}
 .spread-line{text-align:center;padding:6px 0;font-size:12px;color:#f5a623;border-top:1px solid #222;border-bottom:1px solid #222;margin:4px 0}
-#depth .wall-notice{font-size:10px;color:#888;padding:4px 8px;margin-top:8px;border-radius:6px;text-align:center}
+#depth .wall-notice{font-size:11px;color:#888;padding:4px 8px;margin-top:8px;border-radius:6px;text-align:center}
 #depth .wall-bid{background:rgba(76,175,80,0.1);color:#4caf50}
 #depth .wall-ask{background:rgba(244,67,54,0.1);color:#ff6b6b}
-.depth-band{display:grid;grid-template-columns:45px 1fr 1fr 44px;gap:4px;padding:2px 4px;font-size:10px;color:#777}
+.depth-band{display:grid;grid-template-columns:45px 1fr 1fr 44px;gap:4px;padding:2px 4px;font-size:11px;color:#777}
 .depth-band .bid-val{color:#4caf50;text-align:right}.depth-band .ask-val{color:#ff6b6b}
-#wallSummary{font-size:10px;line-height:1.5;color:#888;border-top:1px solid #222;margin-top:6px;padding-top:6px}
+#wallSummary{font-size:11px;line-height:1.5;color:#888;border-top:1px solid #222;margin-top:6px;padding-top:6px}
 
 /* Center: Trade Flow */
 #center{display:flex;flex-direction:column;gap:4px;min-height:0}
 #tradeFlow{background:#111;flex:1;min-height:0;overflow-y:auto;padding:8px}
 #tradeFlow h3{color:#f5a623;font-size:13px;margin-bottom:8px}
-.trade-row{display:flex;gap:8px;padding:2px 6px;font-size:11px;font-family:monospace;border-bottom:1px solid rgba(255,255,255,0.02)}
+.trade-row{display:flex;gap:8px;padding:2px 6px;font-size:12px;font-family:monospace;border-bottom:1px solid rgba(255,255,255,0.02)}
 .trade-row.buy{background:rgba(76,175,80,0.08)}
 .trade-row.sell{background:rgba(244,67,54,0.08)}
 .trade-row.bigBuy{background:rgba(76,175,80,0.2);font-weight:700}
@@ -60,9 +65,9 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 #deltaMeter{height:8px;background:#222;border-radius:4px;overflow:hidden;margin-bottom:6px}
 #deltaFill{height:100%;background:#4caf50;transition:width 0.3s;border-radius:4px}
 #deltaFill.sell{background:#f44336}
-#deltaStats{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#888;flex-wrap:wrap}
+#deltaStats{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#888;flex-wrap:wrap}
 #bigTradeBar{max-height:126px;overflow-y:auto}
-.big-trade-row{display:grid;grid-template-columns:118px 72px 92px 1fr 92px;gap:6px;align-items:center;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.04);font-family:monospace;font-size:10px}
+.big-trade-row{display:grid;grid-template-columns:124px 78px 96px 1fr 98px;gap:6px;align-items:center;padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.04);font-family:monospace;font-size:11px}
 .big-trade-row.buy{border-left:3px solid #4caf50}.big-trade-row.sell{border-left:3px solid #f44336}
 .impact-positive{color:#4caf50}.impact-negative{color:#f44336}.impact-neutral{color:#888}
 
@@ -70,49 +75,50 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 #right{display:flex;flex-direction:column;gap:4px}
 #chainData{background:#111;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr;gap:0 12px;flex-shrink:0}
 #chainData h3{color:#f5a623;font-size:13px;margin-bottom:5px;grid-column:1/-1}
-.chain-row{display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,0.03)}
+.chain-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px;border-bottom:1px solid rgba(255,255,255,0.03)}
 .chain-row .val{color:#eee;font-weight:600}
 .chain-row.chain-note{grid-column:1/-1}
 #volProfile{flex:0 0 145px!important;max-height:145px!important}
 
 #alerts{background:#111;flex:1;overflow-y:auto;padding:12px}
 #alerts h3{color:#f5a623;font-size:13px;margin-bottom:8px}
-.alert{font-size:11px;padding:6px 10px;margin-bottom:4px;border-radius:6px;line-height:1.5}
+.alert{font-size:12px;padding:6px 10px;margin-bottom:4px;border-radius:6px;line-height:1.5}
 .alert.bigBuy{background:rgba(76,175,80,0.15);border-left:3px solid #4caf50}
 .alert.bigSell{background:rgba(244,67,54,0.15);border-left:3px solid #f44336}
 .alert.info{background:rgba(66,133,244,0.1);border-left:3px solid #4285f4}
-.alert .time{color:#666;font-size:10px}
+.alert .time{color:#777;font-size:11px}
 
 /* Bottom analytics */
 #bottom{grid-column:1/-1;display:grid;grid-template-columns:1.25fr 1fr .9fr;gap:4px;min-height:0}
 .bottom-panel{background:#111;padding:10px;overflow:hidden;min-height:0}
 .bottom-panel h3{color:#f5a623;font-size:13px;margin-bottom:7px}
 #deltaWindows{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px}
-.delta-window{background:#181818;border-radius:5px;padding:5px 7px;font-size:10px;color:#777}
-.delta-window b{display:block;font-size:13px;margin-top:2px}
+.delta-window{background:#181818;border-radius:5px;padding:5px 7px;font-size:11px;color:#888}
+.delta-window b{display:block;font-size:14px;margin-top:2px}
+.delta-window span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cvdChart{width:100%;height:112px;display:block;background:#0d0d0d;border-radius:4px}
-.future-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px}
+.future-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:12px}
 .future-item{display:flex;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.04);padding:3px 0}
 .future-item .v{color:#eee;font-weight:600}
-#microFlow{margin-top:7px;padding:6px;background:#181818;border-radius:5px;font-size:10px;color:#888}
+#microFlow{margin-top:7px;padding:6px;background:#181818;border-radius:5px;font-size:11px;color:#999}
 #signalPanel{border-top:2px solid #555;transition:border-color .2s,background .2s}
 #signalPanel.signal-enter{border-top-color:#4caf50;background:linear-gradient(180deg,rgba(76,175,80,.09),#111 42%)}
 #signalPanel.signal-exit{border-top-color:#f44336;background:linear-gradient(180deg,rgba(244,67,54,.09),#111 42%)}
 #signalPanel.signal-watch{border-top-color:#f5a623}
 #signalPanel.signal-hold{border-top-color:#4285f4}
 .signal-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
-#signalBadge{font-size:10px;padding:2px 7px;border-radius:10px;background:#252525;color:#aaa;white-space:nowrap}
+#signalBadge{font-size:11px;padding:2px 7px;border-radius:10px;background:#252525;color:#bbb;white-space:nowrap}
 #signalHeadline{font-size:19px;font-weight:800;letter-spacing:.5px;margin:2px 0 3px;color:#ddd}
-#signalScore{font-size:10px;color:#aaa;margin-bottom:4px}
-#signalMetrics{font-size:9px;color:#777;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+#signalScore{font-size:11px;color:#bbb;margin-bottom:4px}
+#signalMetrics{font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
 #signalReasons{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:52px;overflow-y:auto;margin-bottom:5px}
-.signal-reason{font-size:9px;line-height:1.35;padding:4px 5px;border-radius:4px;background:#171717;color:#888}
+.signal-reason{font-size:11px;line-height:1.4;padding:4px 5px;border-radius:4px;background:#171717;color:#999}
 .signal-reason.good{border-left:2px solid #4caf50}.signal-reason.risk{border-left:2px solid #f44336}
-#positionRow{display:flex;align-items:center;gap:6px;font-size:9px;color:#777}
-#positionToggle{border:1px solid #444;background:#202020;color:#ddd;border-radius:4px;padding:3px 7px;font-size:9px;cursor:pointer}
+#positionRow{display:flex;align-items:center;gap:6px;font-size:11px;color:#888}
+#positionToggle{border:1px solid #555;background:#202020;color:#eee;border-radius:4px;padding:3px 7px;font-size:11px;cursor:pointer}
 #positionToggle:hover{border-color:#f5a623}
 #signalDisclaimer{margin-left:auto;color:#555;white-space:nowrap}
-#log{height:21px;overflow:hidden;text-overflow:ellipsis;padding:3px 0 0;margin-top:4px;border-top:1px solid #1e1e1e;font-size:9px;font-family:monospace;color:#555;white-space:nowrap}
+#log{height:21px;overflow:hidden;text-overflow:ellipsis;padding:3px 0 0;margin-top:4px;border-top:1px solid #1e1e1e;font-size:10px;font-family:monospace;color:#666;white-space:nowrap}
 .fresh{color:#4caf50}.stale{color:#f44336}.muted{color:#777}
 
 /* Connecting overlay */
@@ -147,7 +153,7 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
 
   <div id="center">
     <div id="tradeFlow"><h3>📈 实时成交流 (aggTrade)</h3><div id="trades"></div></div>
-    <div id="bigTradeBar" style="background:#111;padding:6px 8px;font-size:11px;color:#aaa;flex-shrink:0;border-top:1px solid #222;min-height:28px;">💣 大单记录：暂无</div>
+    <div id="bigTradeBar" style="background:#111;padding:6px 8px;font-size:12px;color:#bbb;flex-shrink:0;border-top:1px solid #222;min-height:28px;">💣 大单记录：暂无</div>
     <div id="deltaBar">
       <h3>⚡ 主动成交 Delta (UTC日内)</h3>
       <div id="deltaMeter"><div id="deltaFill" style="width:50%"></div></div>
@@ -172,11 +178,11 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
       <div class="chain-row"><span>有余额地址</span><span class="val" id="bcHodl">---</span></div>
       <div class="chain-row"><span>Mempool</span><span class="val" id="bcMemp">---</span></div>
       <div class="chain-row"><span>最大转账24h</span><span class="val" id="bcLargest">---</span></div>
-      <div class="chain-row chain-note"><span>链上说明</span><span class="val" id="whaleScore" style="font-size:10px;text-align:right;max-width:250px;">只能确认转账，不能判断买卖方向</span></div>
+      <div class="chain-row chain-note"><span>链上说明</span><span class="val" id="whaleScore" style="font-size:11px;text-align:right;max-width:250px;">只能确认转账，不能判断买卖方向</span></div>
     </div>
     <div id="volProfile" style="background:#111;padding:10px;max-height:220px;overflow-y:auto;">
-      <h3 style="color:#f5a623;font-size:13px;margin-bottom:6px;">📊 成交分布 <span style="font-size:10px;color:#888;">(UTC日内·1m近似)</span></h3>
-      <div id="vpContent" style="font-size:10px;font-family:monospace;color:#888;text-align:center;padding:10px;">等待数据...</div>
+      <h3 style="color:#f5a623;font-size:13px;margin-bottom:6px;">📊 成交分布 <span style="font-size:11px;color:#999;">(UTC日内·1m近似)</span></h3>
+      <div id="vpContent" style="font-size:11px;font-family:monospace;color:#999;text-align:center;padding:10px;">等待数据...</div>
     </div>
     <div id="alerts"><h3>🔔 异动提醒</h3><div style="font-size:11px;color:#666;padding:20px;text-align:center;">等待交易数据...</div></div>
   </div>
@@ -194,7 +200,7 @@ body{background:#0a0a1a;color:#ccc;font-family:'Segoe UI',system-ui,sans-serif;o
       <canvas id="cvdChart"></canvas>
     </div>
     <div class="bottom-panel">
-      <h3>⚙️ DOGE 永续合约 <span id="futuresStatus" class="muted" style="font-size:10px;">连接中</span></h3>
+      <h3>⚙️ DOGE 永续合约 <span id="futuresStatus" class="muted" style="font-size:11px;">连接中</span></h3>
       <div class="future-grid">
         <div class="future-item"><span>标记价格</span><span class="v" id="fMark">---</span></div>
         <div class="future-item"><span>现货-永续基差</span><span class="v" id="fBasis">---</span></div>
@@ -900,7 +906,7 @@ function renderBigTrades() {
       '<span class="' + impactClass(i60) + '">' + impactText(event, '60s') + '</span></span>' +
       '<span>' + escapeHtml(event.classification || '观察中') + '</span></div>';
   }).join('');
-  panel.innerHTML = '<div style="font-size:10px;color:#888;padding:0 4px 4px;">💣 最近6笔大单：价格影响按成交后10秒/30秒/60秒计算</div>' + rows;
+  panel.innerHTML = '<div style="font-size:11px;color:#999;padding:0 4px 4px;">💣 最近6笔大单：价格影响按成交后10秒/30秒/60秒计算</div>' + rows;
 }
 
 function classifyBigTrade(event) {
@@ -1267,7 +1273,7 @@ function updateWindowCard(valueId, ratioId, stats) {
   const valueEl = $(valueId);
   valueEl.textContent = formatDelta(stats.net);
   valueEl.style.color = stats.net > 0 ? '#4caf50' : stats.net < 0 ? '#f44336' : '#aaa';
-  $(ratioId).textContent = '占总主动量 ' + (stats.ratio > 0 ? '+' : '') + stats.ratio.toFixed(2) + '%';
+  $(ratioId).textContent = '主动 ' + (stats.ratio > 0 ? '+' : '') + stats.ratio.toFixed(2) + '%';
 }
 
 function updateAllMetrics() {
@@ -1606,7 +1612,7 @@ function renderVolumeProfile() {
   const maxQty = Math.max(...entries.map(e => e.qty));
   const poc = entries.reduce((best, e) => e.qty > best.qty ? e : best, entries[0]);
   let shown = 0;
-  let html = '<div style="font-size:10px;color:#888;margin-bottom:4px;">近似POC: <span style="color:#f5a623;font-weight:700;">$' + poc.price.toFixed(4) + '</span> (' + (poc.qty / 1e6).toFixed(2) + 'M DOGE)</div>';
+  let html = '<div style="font-size:11px;color:#999;margin-bottom:4px;">近似POC: <span style="color:#f5a623;font-weight:700;">$' + poc.price.toFixed(4) + '</span> (' + (poc.qty / 1e6).toFixed(2) + 'M DOGE)</div>';
   for (const entry of entries) {
     if (shown >= 30) break;
     if (entry.qty / maxQty < 0.02 && shown > 10) continue;
