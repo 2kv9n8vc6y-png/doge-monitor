@@ -1,0 +1,54 @@
+{
+  "name": "doge-realtime-dashboard",
+  "version": "1.0.0",
+  "description": "DOGE 实时订单流与交易决策看板",
+  "main": "main.js",
+  "author": "2kv9n8vc6y-png",
+  "license": "UNLICENSED",
+  "scripts": {
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "43.1.1",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.dogemonitor.dashboard",
+    "productName": "DOGE实时交易看板",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../pc-dashboard.html",
+        "to": "pc-dashboard.html"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "DOGE-Dashboard-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DOGE实时交易看板",
+      "deleteAppDataOnUninstall": false
+    }
+  }
+}
